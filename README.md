@@ -1,70 +1,99 @@
 # NIMO Core
 
-NIMO Core is the standalone intelligence and integration layer for Manav Agarwal's project ecosystem.
+NIMO Core is the standalone intelligence and integration layer for Manav Agarwal's public project ecosystem.
 
-## Architecture decision
+## Architecture
 
-NIMO is no longer owned by a single portfolio codebase. The portfolio remains a visible client of NIMO, while NIMO Core becomes the canonical backend, knowledge registry, conversation engine, and project integration layer.
+NIMO is no longer owned by a single portfolio codebase. The portfolio remains a visible native client, while NIMO Core owns the canonical public knowledge registry, secure provider access, validation, bounded conversation context, observability, and project integration contract.
 
-### What stays centralized
+### Central responsibilities
 
-- NIMO identity, persona, safety rules, and response policy
-- Global project catalogue and cross-project recommendations
-- Shared owner/profile knowledge
-- Conversation sessions and bounded multi-turn history
-- OpenRouter/provider routing and failover
-- Tool/action validation
-- Rate limiting, abuse protection, observability, and API contracts
+- NIMO identity, response policy, and public knowledge
+- Cross-project discovery and relevant recommendations
+- OpenRouter model routing and failover
+- Strict message, history, language, page, and project validation
+- Structured internal errors and safe public responses
+- Request IDs, health checks, rate-limiter integration, and API contracts
 
-### What remains inside each project
+### Project-local responsibilities
 
-- Current page, route, selected item, and runtime state
-- Project-specific actions and capability handlers
-- Local navigation implementation
-- Sensitive project data that should not be copied into a public central registry
+- Visible NIMO interface and product-native styling
+- Current route, page, selected item, and runtime state
+- Local navigation and allowlisted capability handlers
+- Private or unpublished data, which must never enter NIMO Core
 
-Each project integrates through a small NIMO client/adapter and sends a trusted `projectId` plus validated context. NIMO Core can therefore answer questions about every registered project and promote relevant projects from any client.
+Private projects are excluded completely. NIMO does not index, acknowledge, summarize, or promote a project unless it is explicitly registered as public.
 
-## Target flow
+## Flow
 
 ```text
-Portfolio / ToolVerse / SELFYY / SHIFT-ZERO / FATE-AI
-                         |
-                    NIMO Client
-                         |
-                     NIMO Core
-       Project Registry | Memory | Tool Router
-                         |
-             OpenRouter / future providers
+Portfolio / ToolVerse / SHIFT-ZERO / FATE-AI / future public clients
+                              |
+                     Native NIMO client
+                              |
+                         NIMO Core
+            Validation | Knowledge | Memory | Routing
+                              |
+                         OpenRouter
 ```
 
-## Initial API
+## API
 
 - `GET /api/health`
-- `GET /api/projects`
-- `POST /api/nimo/chat`
+- `POST /api/nimo/chat` — backward-compatible portfolio endpoint
+- `POST /v1/chat` — versioned endpoint
 
-Planned:
+Accepted chat payload:
 
-- `POST /api/sessions`
-- `GET /api/projects/:projectId`
-- `POST /api/tools/:toolId/execute`
+```json
+{
+  "message": "Tell me about ToolVerse",
+  "context": {
+    "projectId": "portfolio",
+    "pageId": "project-nimo",
+    "sectionId": "architecture",
+    "language": "en"
+  },
+  "history": [
+    { "role": "user", "content": "What is NIMO?" },
+    { "role": "assistant", "content": "NIMO is..." }
+  ]
+}
+```
+
+History is validated and limited to the latest 10 turns. Arbitrary context strings never enter the system prompt.
+
+## Local setup
+
+```powershell
+npm install
+npx wrangler secret put OPENROUTER_API_KEY
+npm test
+npm run dev
+```
+
+Deploy only after tests and smoke checks pass:
+
+```powershell
+npm run deploy
+```
+
+## Implemented safeguards
+
+- Fixed provider import boundaries through explicit route imports
+- Canonical public project registry
+- Private-project exclusion regression test
+- Bounded multi-turn conversation history
+- Project and route ID allowlisting
+- Provider timeout and ordered model failover
+- Generic browser-facing errors
+- Structured internal provider logs
+- Request IDs and no-store API responses
+- Exact CORS allowlist
+- Optional Cloudflare distributed rate-limiter binding
+- In-memory limiter only as a local/development fallback
+- Vitest validation and privacy regression tests
 
 ## Migration policy
 
-The portfolio NIMO widget must remain visible during migration. The existing portfolio implementation will only be removed after the standalone API and client adapter are deployed and verified. Migration will be done through an adapter-compatible endpoint so the UI does not disappear or require a full rewrite.
-
-## Immediate engineering priorities
-
-1. Fix the missing `queryOpenRouter` import from the old backend.
-2. Replace hardcoded duplicate knowledge with canonical JSON manifests.
-3. Add validated multi-turn history.
-4. Reject arbitrary project/context values through registry allowlists.
-5. Replace in-memory rate limiting with a distributed Cloudflare-compatible limiter.
-6. Add generic client errors and structured internal logs.
-7. Add automated tests, linting, CI, and provider failover tests.
-8. Add session/anonymous abuse controls before exposing costly provider routes.
-
-## Status
-
-Repository initialized. The existing portfolio remains the active NIMO client until the standalone service reaches migration readiness.
+The portfolio widget remains visible throughout migration. The old endpoint stays active until NIMO Core is deployed and passes health, chat, failover, CORS, and frontend smoke tests. Only then should the portfolio's backend URL be switched. This prevents a backend refactor from removing or breaking the visible assistant.
