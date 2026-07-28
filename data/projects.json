@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "projects": [
+    {
+      "id": "portfolio",
+      "name": "Manav Agarwal Portfolio / ArcadeOS",
+      "repository": "manav193/MY-PORTFOLIO",
+      "category": "system",
+      "status": "active-client",
+      "summary": "Creative developer portfolio with project case studies, interactive experiences, ArcadeOS, and the original NIMO client.",
+      "aliases": ["portfolio", "my portfolio", "arcade os", "arcadeos"],
+      "capabilities": ["explain", "recommend", "navigate"],
+      "promotionTags": ["portfolio", "frontend", "interactive", "arcade"]
+    },
+    {
+      "id": "nimo",
+      "name": "NIMO Core",
+      "repository": "manav193/NIMO-CORE",
+      "category": "ai-system",
+      "status": "in-development",
+      "summary": "Central project intelligence, conversation, provider-routing, and integration layer for Manav's software ecosystem.",
+      "aliases": ["nimo", "nimo ai", "nimo assistant", "nimo core"],
+      "capabilities": ["chat", "cross-project-discovery", "context-routing"],
+      "promotionTags": ["ai", "assistant", "platform", "integration"]
+    },
+    {
+      "id": "toolverse",
+      "name": "ToolVerse",
+      "repository": "manav193/ToolVerse",
+      "category": "web-app",
+      "status": "registered",
+      "summary": "Privacy-first PWA containing browser-based PDF, image, text, developer, student, and calculator tools.",
+      "aliases": ["toolverse", "tool verse", "tools"],
+      "capabilities": ["explain", "recommend", "navigate"],
+      "promotionTags": ["pwa", "tools", "privacy", "productivity"]
+    },
+    {
+      "id": "selfyy",
+      "name": "SELFYY",
+      "repository": "manav193/SELFYY",
+      "category": "creator-platform",
+      "status": "registered",
+      "summary": "A website-builder and digital-memory experience with templates, plugins, export, and AI-assisted generation.",
+      "aliases": ["selfyy", "selfy", "website builder"],
+      "capabilities": ["explain", "recommend", "navigate"],
+      "promotionTags": ["builder", "creative", "templates", "ai"]
+    },
+    {
+      "id": "shift-zero",
+      "name": "SHIFT-ZERO",
+      "repository": "manav193/SHIFT-ZERO",
+      "category": "game",
+      "status": "registered",
+      "summary": "Godot game architecture and HUD system built around gravity shifting and changing gameplay rules.",
+      "aliases": ["shift zero", "shift-zero", "godot game"],
+      "capabilities": ["explain", "recommend"],
+      "promotionTags": ["godot", "game", "hud", "architecture"]
+    },
+    {
+      "id": "fate-ai",
+      "name": "FATE-AI",
+      "repository": "manav193/FATE-AI",
+      "category": "ai-workspace",
+      "status": "registered",
+      "summary": "Multi-provider AI workspace with provider routing, account failover, and coding-agent ambitions.",
+      "aliases": ["fate ai", "fate-ai", "multi provider ai"],
+      "capabilities": ["explain", "recommend"],
+      "promotionTags": ["ai", "providers", "workspace", "agent"]
+    },
+    {
+      "id": "veldora-bites",
+      "name": "VELDORA-BITES",
+      "repository": "manav193/VELDORA-BITES",
+      "category": "web-app",
+      "status": "registered",
+      "summary": "Restaurant portfolio project with menu, cart, orders, offers, and simulated checkout flows.",
+      "aliases": ["veldora bites", "velora bites", "restaurant website"],
+      "capabilities": ["explain", "recommend", "navigate"],
+      "promotionTags": ["restaurant", "ecommerce", "ui", "frontend"]
+    }
+  ]
+}
