@@ -18,7 +18,7 @@
       "repository": "manav193/NIMO-CORE",
       "category": "ai-system",
       "status": "in-development",
-      "summary": "Central project intelligence, conversation, provider-routing, and integration layer for Manav's software ecosystem.",
+      "summary": "Central project intelligence, conversation, provider-routing, and integration layer for Manav's public software ecosystem.",
       "aliases": ["nimo", "nimo ai", "nimo assistant", "nimo core"],
       "capabilities": ["chat", "cross-project-discovery", "context-routing"],
       "promotionTags": ["ai", "assistant", "platform", "integration"]
@@ -33,17 +33,6 @@
       "aliases": ["toolverse", "tool verse", "tools"],
       "capabilities": ["explain", "recommend", "navigate"],
       "promotionTags": ["pwa", "tools", "privacy", "productivity"]
-    },
-    {
-      "id": "selfyy",
-      "name": "SELFYY",
-      "repository": "manav193/SELFYY",
-      "category": "creator-platform",
-      "status": "registered",
-      "summary": "A website-builder and digital-memory experience with templates, plugins, export, and AI-assisted generation.",
-      "aliases": ["selfyy", "selfy", "website builder"],
-      "capabilities": ["explain", "recommend", "navigate"],
-      "promotionTags": ["builder", "creative", "templates", "ai"]
     },
     {
       "id": "shift-zero",
