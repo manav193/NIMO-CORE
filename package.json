@@ -1,0 +1,21 @@
+{
+  "name": "nimo-core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone intelligence and integration layer for NIMO.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "globals": "^15.0.0",
+    "vitest": "^2.1.0",
+    "wrangler": "^4.0.0"
+  }
+}
