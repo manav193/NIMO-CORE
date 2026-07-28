@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "nimo-core",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-28",
+  "observability": { "enabled": true },
+  "vars": {
+    "OPENROUTER_MODELS": "google/gemma-4-26b-a4b-it:free,nvidia/nemotron-3-super-120b-a12b:free,openai/gpt-oss-20b:free",
+    "ALLOWED_ORIGINS": "https://my-portfolio-mu-jade-52.vercel.app,http://localhost:8080,http://localhost:5500,http://127.0.0.1:5500,http://localhost:4173"
+  }
+}
