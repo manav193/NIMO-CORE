@@ -53,7 +53,12 @@ export default {
 
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === '/api/health') {
-      return json({ status: 'ok', service: 'NIMO Core', version: '1.0.0' }, 200, cors.headers, requestId);
+      return json({
+        status: 'ok',
+        service: 'NIMO Core',
+        version: '1.1.0',
+        features: ['deterministic-facts', 'response-cache', 'chat-telemetry', 'provider-failover']
+      }, 200, cors.headers, requestId);
     }
 
     if (request.method === 'POST' && (url.pathname === '/api/nimo/chat' || url.pathname === '/v1/chat')) {
