@@ -9,13 +9,18 @@ function normalize(value) {
     .trim();
 }
 
+function getAliases(project) {
+  return [project.name, project.id, ...(project.aliases || [])].map(normalize).filter(Boolean);
+}
+
 function findProject(text) {
   const value = normalize(text);
-  return PROJECTS.find(project =>
-    [project.name, project.id, ...(project.aliases || [])]
-      .map(normalize)
-      .some(alias => alias && value.includes(alias))
-  );
+  return PROJECTS.find(project => getAliases(project).some(alias => value.includes(alias)));
+}
+
+function findMentionedProjects(text) {
+  const value = normalize(text);
+  return PROJECTS.filter(project => getAliases(project).some(alias => value.includes(alias)));
 }
 
 function findTechnology(text) {
@@ -34,9 +39,29 @@ function findTechnology(text) {
   return matches;
 }
 
+function compareProjects(first, second) {
+  const firstStack = first.technologies?.length ? ` Its verified stack includes ${first.technologies.join(', ')}.` : '';
+  const secondStack = second.technologies?.length ? ` Its verified stack includes ${second.technologies.join(', ')}.` : '';
+
+  return `${first.name} is ${first.summary.toLowerCase()}${firstStack}\n\n${second.name} is ${second.summary.toLowerCase()}${secondStack}\n\nIn simple terms, ${first.name} and ${second.name} serve different roles: one is ${first.tags?.includes('frontend') || first.tags?.includes('portfolio') ? 'a frontend showcase' : 'a software service or product'}, while the other is ${second.tags?.includes('frontend') || second.tags?.includes('portfolio') ? 'a frontend showcase' : 'a software service or product'}.`;
+}
+
 export function resolveDeterministicReply(message, history = []) {
   const text = normalize(message);
-  if (!text || history.length > 0) return null;
+  if (!text) return null;
+
+  const comparisonQuestion = /\b(compare|comparison|difference|versus|vs|between)\b/.test(text);
+  if (comparisonQuestion) {
+    const projects = findMentionedProjects(text);
+    if (projects.length === 2) {
+      return {
+        reply: compareProjects(projects[0], projects[1]),
+        source: 'deterministic_comparison'
+      };
+    }
+  }
+
+  if (history.length > 0) return null;
 
   const technologyQuestion = /\b(which|what)\s+(project|one|app|game).*\b(use|uses|using|built with)\b/.test(text)
     || /\bwhere\s+is\b.*\bused\b/.test(text);
