@@ -2,12 +2,20 @@
 
 NIMO Core is the standalone intelligence and integration layer for Manav Agarwal's public project ecosystem.
 
+![NIMO assistant and hybrid architecture](https://raw.githubusercontent.com/manav193/MY-PORTFOLIO/main/frontend/images/nimo-preview.svg)
+
+[View the full NIMO architecture case study](https://my-portfolio-mu-jade-52.vercel.app/project-nimo.html)
+
 **Current production version:** `1.1.0`
+
+## Why it exists
+
+NIMO began as a portfolio-aware assistant. Moving intelligence into a standalone Cloudflare Worker separates presentation from project knowledge, validation, provider access, conversation handling, caching, and observability. The portfolio retains its native assistant UI while NIMO Core becomes independently deployable and testable.
 
 ## Responsibilities
 
 - Canonical public project knowledge
-- Deterministic technology and project comparisons
+- Deterministic technology ownership and named-project comparisons
 - Bounded multi-turn conversation context
 - OpenRouter model routing and ordered failover
 - Reasoning-leak and truncated-response protection
@@ -30,6 +38,8 @@ Portfolio or future public client
               |
      Controlled provider failover
 ```
+
+Known portfolio facts and comparisons can resolve deterministically. Complex or conversational requests use validated history and controlled provider failover.
 
 ## Production endpoint
 
@@ -89,9 +99,9 @@ npm run deploy
 - Deterministic named-project comparisons
 - Versioned response-cache namespace
 - Chat source and latency telemetry
-- Provider success/failure telemetry
+- Provider success and failure telemetry
 - Reasoning-output exclusion and leak detection
-- Incomplete-response rejection and failover
+- Incomplete-response rejection and automatic failover
 
 ## Security notes
 
@@ -103,7 +113,7 @@ npm run deploy
 
 ## Integration
 
-The visible portfolio client is maintained in [MY-PORTFOLIO](https://github.com/manav193/MY-PORTFOLIO).
+The visible local-first client is maintained in [MY-PORTFOLIO](https://github.com/manav193/MY-PORTFOLIO).
 
 ## Release
 
