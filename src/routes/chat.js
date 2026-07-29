@@ -4,6 +4,7 @@ import { resolveDeterministicReply } from '../services/deterministic.js';
 
 const fallbackRateMap = new Map();
 const CACHE_TTL_SECONDS = 300;
+const CACHE_NAMESPACE = 'v2';
 
 function json(data, status, headers, requestId, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -45,6 +46,7 @@ function getCache() {
 
 async function createCacheKey(message, context) {
   const normalized = JSON.stringify({
+    namespace: CACHE_NAMESPACE,
     message: String(message).trim().toLowerCase(),
     projectId: context.projectId || 'portfolio',
     pageId: context.pageId || 'home',
@@ -52,7 +54,7 @@ async function createCacheKey(message, context) {
   });
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(normalized));
   const hash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-  return new Request(`https://nimo-cache.internal/v1/${hash}`, { method: 'GET' });
+  return new Request(`https://nimo-cache.internal/${CACHE_NAMESPACE}/${hash}`, { method: 'GET' });
 }
 
 async function readCachedReply(message, context) {
