@@ -28,6 +28,7 @@ IDENTITY
 - Treat the technology lists below as verified facts.
 - Resolve comparative and follow-up questions using the supplied conversation history.
 - Recommend another registered public project only when relevant.
+- Every response must be complete and end with a finished sentence.
 - Return only the final user-facing response, under 160 words.
 
 PUBLIC PROJECT KNOWLEDGE
@@ -40,15 +41,17 @@ TRUSTED CONTEXT
 - Language: ${context.language}`;
 }
 
-function isUnusable(text) {
+function isUnusable(text, finishReason) {
   const value = String(text || '').trim();
   if (!value) return true;
 
   const exactMeta = /^(safe|unsafe|user safety:\s*(safe|unsafe))$/i;
   const reasoningLeak = /(^|\n)\s*(okay,?\s+the user|the user (asks|wants|is asking)|let me (think|check|review|analy[sz]e|recall|re-examine)|looking back|from the (public|verified|provided) (project )?knowledge|i need to|hmm[,.:]|first,?\s+i(?:'ll| will| need)|the key issue here|so the distinction is clear)/i;
-  const unfinished = /(?:\bno other registered|\bthe user might be confusing|\bthe system keeps failing|\bbut the verified knowledge is clear)[^.?!]*$/i;
+  const unfinishedMeta = /(?:\bno other registered|\bthe user might be confusing|\bthe system keeps failing|\bbut the verified knowledge is clear)[^.?!]*$/i;
+  const providerTruncated = finishReason === 'length' || finishReason === 'content_filter';
+  const sentenceTruncated = value.length >= 80 && !/[.!?…。！？」”'`)\]}]$/.test(value);
 
-  return exactMeta.test(value) || reasoningLeak.test(value) || unfinished.test(value);
+  return exactMeta.test(value) || reasoningLeak.test(value) || unfinishedMeta.test(value) || providerTruncated || sentenceTruncated;
 }
 
 async function requestModel({ apiKey, model, messages, env }) {
@@ -70,8 +73,8 @@ async function requestModel({ apiKey, model, messages, env }) {
       body: JSON.stringify({
         model,
         messages,
-        max_tokens: 450,
-        temperature: 0.25,
+        max_tokens: 600,
+        temperature: 0.2,
         reasoning: { exclude: true }
       }),
       signal: controller.signal
@@ -85,11 +88,14 @@ async function requestModel({ apiKey, model, messages, env }) {
     }
 
     const data = await response.json();
-    const reply = data.choices?.[0]?.message?.content?.trim();
-    if (isUnusable(reply)) {
+    const choice = data.choices?.[0];
+    const reply = choice?.message?.content?.trim();
+    const finishReason = choice?.finish_reason || 'unknown';
+
+    if (isUnusable(reply, finishReason)) {
       return {
         ok: false,
-        internalError: `reasoning_or_unusable_reply;model=${data.model || model};latency_ms=${Date.now() - startedAt}`
+        internalError: `truncated_reasoning_or_unusable_reply;finish_reason=${finishReason};model=${data.model || model};latency_ms=${Date.now() - startedAt}`
       };
     }
 
@@ -97,6 +103,7 @@ async function requestModel({ apiKey, model, messages, env }) {
       ok: true,
       reply,
       model: data.model || model,
+      finishReason,
       latencyMs: Date.now() - startedAt
     };
   } catch (error) {
@@ -134,6 +141,7 @@ export async function queryOpenRouter({ message, history, context, env, requestI
         event: 'provider_success',
         requestId,
         model: result.model,
+        finishReason: result.finishReason,
         latencyMs: result.latencyMs
       }));
       return result;
