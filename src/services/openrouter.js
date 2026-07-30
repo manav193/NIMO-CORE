@@ -34,7 +34,8 @@ IDENTITY
 
 CANONICAL CONTACT
 - Manav Agarwal's only official contact email is ${CANONICAL_CONTACT_EMAIL}.
-- Never provide or infer any other email address for Manav.
+- Manav Agarwal's canonical portfolio is https://manavagarwal.me.
+- Never provide or infer any other email address or portfolio URL for Manav.
 
 PUBLIC PROJECT KNOWLEDGE
 ${getPublicKnowledgeText()}
@@ -69,7 +70,7 @@ async function requestModel({ apiKey, model, messages, env }) {
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': env.PUBLIC_APP_URL || 'https://my-portfolio-mu-jade-52.vercel.app',
+        'HTTP-Referer': env.PUBLIC_APP_URL || 'https://manavagarwal.me',
         'X-Title': 'NIMO Core'
       },
       body: JSON.stringify({ model, messages, max_tokens: 600, temperature: 0.2, reasoning: { exclude: true } }),
