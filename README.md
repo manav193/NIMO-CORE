@@ -4,7 +4,7 @@ NIMO Core is the standalone intelligence and integration layer for Manav Agarwal
 
 ![NIMO assistant and hybrid architecture](https://raw.githubusercontent.com/manav193/MY-PORTFOLIO/main/frontend/images/nimo-preview.svg)
 
-[View the full NIMO architecture case study](https://my-portfolio-mu-jade-52.vercel.app/project-nimo.html)
+[View the full NIMO architecture case study](https://manavagarwal.me/project-nimo.html)
 
 **Current production version:** `1.1.0`
 
@@ -113,7 +113,7 @@ npm run deploy
 
 ## Integration
 
-The visible local-first client is maintained in [MY-PORTFOLIO](https://github.com/manav193/MY-PORTFOLIO).
+The visible local-first client is maintained in [MY-PORTFOLIO](https://github.com/manav193/MY-PORTFOLIO), with the public portfolio at [manavagarwal.me](https://manavagarwal.me).
 
 ## Release
 
