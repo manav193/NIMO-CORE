@@ -6,6 +6,7 @@ const DEFAULT_MODELS = [
   'google/gemma-4-26b-a4b-it:free',
   'openrouter/free'
 ];
+const CANONICAL_CONTACT_EMAIL = 'monographpixel@gmail.com';
 
 function getModels(env) {
   const configured = String(env.OPENROUTER_MODELS || env.OPENROUTER_MODEL || '')
@@ -31,6 +32,10 @@ IDENTITY
 - Every response must be complete and end with a finished sentence.
 - Return only the final user-facing response, under 160 words.
 
+CANONICAL CONTACT
+- Manav Agarwal's only official contact email is ${CANONICAL_CONTACT_EMAIL}.
+- Never provide or infer any other email address for Manav.
+
 PUBLIC PROJECT KNOWLEDGE
 ${getPublicKnowledgeText()}
 
@@ -44,13 +49,11 @@ TRUSTED CONTEXT
 function isUnusable(text, finishReason) {
   const value = String(text || '').trim();
   if (!value) return true;
-
   const exactMeta = /^(safe|unsafe|user safety:\s*(safe|unsafe))$/i;
   const reasoningLeak = /(^|\n)\s*(okay,?\s+the user|the user (asks|wants|is asking)|let me (think|check|review|analy[sz]e|recall|re-examine)|looking back|from the (public|verified|provided) (project )?knowledge|i need to|hmm[,.:]|first,?\s+i(?:'ll| will| need)|the key issue here|so the distinction is clear)/i;
   const unfinishedMeta = /(?:\bno other registered|\bthe user might be confusing|\bthe system keeps failing|\bbut the verified knowledge is clear)[^.?!]*$/i;
   const providerTruncated = finishReason === 'length' || finishReason === 'content_filter';
   const sentenceTruncated = value.length >= 80 && !/[.!?…。！？」”'`)\]}]$/.test(value);
-
   return exactMeta.test(value) || reasoningLeak.test(value) || unfinishedMeta.test(value) || providerTruncated || sentenceTruncated;
 }
 
@@ -60,7 +63,6 @@ async function requestModel({ apiKey, model, messages, env }) {
   const timeout = Math.min(Math.max(configuredTimeout, 4000), 10000);
   const timer = setTimeout(() => controller.abort(), timeout);
   const startedAt = Date.now();
-
   try {
     const response = await fetch(OPENROUTER_URL, {
       method: 'POST',
@@ -70,48 +72,19 @@ async function requestModel({ apiKey, model, messages, env }) {
         'HTTP-Referer': env.PUBLIC_APP_URL || 'https://my-portfolio-mu-jade-52.vercel.app',
         'X-Title': 'NIMO Core'
       },
-      body: JSON.stringify({
-        model,
-        messages,
-        max_tokens: 600,
-        temperature: 0.2,
-        reasoning: { exclude: true }
-      }),
+      body: JSON.stringify({ model, messages, max_tokens: 600, temperature: 0.2, reasoning: { exclude: true } }),
       signal: controller.signal
     });
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        internalError: `provider_status=${response.status};model=${model};latency_ms=${Date.now() - startedAt}`
-      };
-    }
-
+    if (!response.ok) return { ok: false, internalError: `provider_status=${response.status};model=${model};latency_ms=${Date.now() - startedAt}` };
     const data = await response.json();
     const choice = data.choices?.[0];
     const reply = choice?.message?.content?.trim();
     const finishReason = choice?.finish_reason || 'unknown';
-
-    if (isUnusable(reply, finishReason)) {
-      return {
-        ok: false,
-        internalError: `truncated_reasoning_or_unusable_reply;finish_reason=${finishReason};model=${data.model || model};latency_ms=${Date.now() - startedAt}`
-      };
-    }
-
-    return {
-      ok: true,
-      reply,
-      model: data.model || model,
-      finishReason,
-      latencyMs: Date.now() - startedAt
-    };
+    if (isUnusable(reply, finishReason)) return { ok: false, internalError: `truncated_reasoning_or_unusable_reply;finish_reason=${finishReason};model=${data.model || model};latency_ms=${Date.now() - startedAt}` };
+    return { ok: true, reply, model: data.model || model, finishReason, latencyMs: Date.now() - startedAt };
   } catch (error) {
     const reason = error?.name === 'AbortError' ? 'timeout' : 'network_error';
-    return {
-      ok: false,
-      internalError: `${reason};model=${model};latency_ms=${Date.now() - startedAt}`
-    };
+    return { ok: false, internalError: `${reason};model=${model};latency_ms=${Date.now() - startedAt}` };
   } finally {
     clearTimeout(timer);
   }
@@ -119,41 +92,21 @@ async function requestModel({ apiKey, model, messages, env }) {
 
 export async function queryOpenRouter({ message, history, context, env, requestId }) {
   const apiKey = env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return {
-      ok: false,
-      publicError: 'Assistant service is not configured.',
-      internalErrors: ['missing_api_key']
-    };
-  }
-
+  if (!apiKey) return { ok: false, publicError: 'Assistant service is not configured.', internalErrors: ['missing_api_key'] };
   const messages = [
     { role: 'system', content: buildSystemPrompt(context) },
     ...history,
     { role: 'user', content: message }
   ];
-
   const internalErrors = [];
   for (const model of getModels(env)) {
     const result = await requestModel({ apiKey, model, messages, env });
     if (result.ok) {
-      console.log(JSON.stringify({
-        event: 'provider_success',
-        requestId,
-        model: result.model,
-        finishReason: result.finishReason,
-        latencyMs: result.latencyMs
-      }));
+      console.log(JSON.stringify({ event: 'provider_success', requestId, model: result.model, finishReason: result.finishReason, latencyMs: result.latencyMs }));
       return result;
     }
-
     internalErrors.push(result.internalError);
     console.warn(JSON.stringify({ event: 'provider_failure', requestId, detail: result.internalError }));
   }
-
-  return {
-    ok: false,
-    publicError: 'NIMO is temporarily unavailable. Please try again shortly.',
-    internalErrors
-  };
+  return { ok: false, publicError: 'NIMO is temporarily unavailable. Please try again shortly.', internalErrors };
 }
