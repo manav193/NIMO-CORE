@@ -1,7 +1,8 @@
 import { handleChat } from './routes/chat.js';
 
 const DEFAULT_ORIGINS = [
-  'https://my-portfolio-mu-jade-52.vercel.app',
+  'https://manavagarwal.me',
+  'https://www.manavagarwal.me',
   'http://localhost:8080',
   'http://localhost:5500',
   'http://127.0.0.1:5500',
