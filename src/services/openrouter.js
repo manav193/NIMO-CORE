@@ -70,9 +70,10 @@ export class OpenRouterProvider {
     appUrl = 'https://manavagarwal.me',
     appName = 'NIMO Core'
   } = {}) {
-    this.apiKey = typeof apiKey === 'string'
-      ? apiKey.trim().replace(/^["']|["']$/g, '')
+    const rawKey = typeof apiKey === 'string'
+      ? apiKey.trim().replace(/^["']|["']$/g, '').replace(/[\x00-\x1F\x7F]/g, '').trim()
       : null;
+    this.apiKey = rawKey && rawKey.length > 0 ? rawKey : null;
     this.models = models && models.length
       ? models
       : (globalThis.process?.env?.OPENROUTER_MODELS

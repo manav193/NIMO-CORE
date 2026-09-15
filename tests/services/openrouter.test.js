@@ -287,6 +287,12 @@ test('OpenRouter constructor strips quotes and whitespace from API key', () => {
 
   const p2 = new OpenRouterProvider({ apiKey: "'sk-or-v1-def456'" });
   assert.equal(p2.apiKey, 'sk-or-v1-def456');
+
+  const p3 = new OpenRouterProvider({ apiKey: '\u0016' });
+  assert.equal(p3.apiKey, null);
+
+  const p4 = new OpenRouterProvider({ apiKey: 'sk-or-v1-abc\u0000def' });
+  assert.equal(p4.apiKey, 'sk-or-v1-abcdef');
 });
 
 test('OpenRouter captures error.code and error.message from HTTP 400 response body', async () => {
