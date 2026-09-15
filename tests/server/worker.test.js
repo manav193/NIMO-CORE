@@ -118,6 +118,53 @@ test('Cloudflare Worker test suite', async t => {
     assert.equal(data.model, 'google/gemini-2.5-flash');
   });
 
+  await t.test('POST /api/nimo/chat returns deterministic fallback reply when OPENROUTER_API_KEY is not configured', async () => {
+    const req = new Request('http://localhost:8787/api/nimo/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'random unknown query 12345' })
+    });
+    // Call without OPENROUTER_API_KEY in env
+    const res = await handleWorkerRequest(req, { ALLOWED_ORIGINS: 'http://localhost:8787' }, {}, {});
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.success, true);
+    assert.equal(data.model, 'fallback');
+    assert.equal(data.source, 'core');
+    assert.match(data.reply, /information/);
+  });
+
+  await t.test('POST /api/nimo/chat gracefully falls back to deterministic reply when provider fails', async () => {
+    const mockFailingAiProvider = {
+      apiKey: 'test-key',
+      complete: async () => ({
+        success: false,
+        reply: 'I could not reach the AI service',
+        model: 'none',
+        error: 'ALL_MODELS_FAILED'
+      })
+    };
+
+    const req = new Request('http://localhost:8787/api/nimo/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: 'random unknown query 67890' })
+    });
+
+    const res = await handleWorkerRequest(
+      req,
+      { OPENROUTER_API_KEY: 'test-key', ALLOWED_ORIGINS: 'http://localhost:8787' },
+      {},
+      { aiProvider: mockFailingAiProvider }
+    );
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.success, true);
+    assert.equal(data.model, 'fallback');
+    assert.equal(data.source, 'core');
+    assert.match(data.reply, /information/);
+  });
+
   await t.test('POST /api/nimo/chat rejects malformed JSON with 400', async () => {
     const req = new Request('http://localhost:8787/api/nimo/chat', {
       method: 'POST',

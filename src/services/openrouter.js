@@ -30,14 +30,30 @@ function isRetryableStatus(status) {
   return status === 408 || status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
 }
 
+/**
+ * Classify HTTP status codes into structured error categories.
+ */
+export function classifyHttpError(status) {
+  if (status === 401) return 'AUTHENTICATION_ERROR';
+  if (status === 402) return 'INSUFFICIENT_CREDITS';
+  if (status === 403) return 'FORBIDDEN';
+  if (status === 404) return 'MODEL_NOT_FOUND';
+  if (status === 408) return 'REQUEST_TIMEOUT';
+  if (status === 429) return 'RATE_LIMITED';
+  if (status >= 500 && status < 600) return 'UPSTREAM_SERVER_ERROR';
+  return 'HTTP_CLIENT_ERROR';
+}
+
 export class OpenRouterProvider {
   constructor({
     apiKey = globalThis.process?.env?.OPENROUTER_API_KEY || null,
     models = null,
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    fetchFn = globalThis.fetch
+    fetchFn = globalThis.fetch,
+    appUrl = 'https://manavagarwal.me',
+    appName = 'NIMO Core'
   } = {}) {
-    this.apiKey = apiKey;
+    this.apiKey = typeof apiKey === 'string' ? apiKey.trim() : null;
     this.models = models && models.length
       ? models
       : (globalThis.process?.env?.OPENROUTER_MODELS
@@ -45,6 +61,8 @@ export class OpenRouterProvider {
           : DEFAULT_MODELS);
     this.timeoutMs = timeoutMs;
     this.fetch = fetchFn;
+    this.appUrl = appUrl;
+    this.appName = appName;
   }
 
   async complete({
@@ -54,6 +72,13 @@ export class OpenRouterProvider {
     requestId = null
   } = {}) {
     if (!this.apiKey) {
+      console.warn(JSON.stringify({
+        level: 'warn',
+        event: 'provider_missing_key',
+        provider: 'openrouter',
+        errorType: 'MISSING_API_KEY',
+        requestId
+      }));
       return {
         success: false,
         reply: 'AI provider is not configured.',
@@ -65,6 +90,13 @@ export class OpenRouterProvider {
     }
 
     if (!Array.isArray(messages) || !messages.length) {
+      console.warn(JSON.stringify({
+        level: 'warn',
+        event: 'provider_invalid_input',
+        provider: 'openrouter',
+        errorType: 'INVALID_INPUT',
+        requestId
+      }));
       return {
         success: false,
         reply: 'Invalid message request.',
@@ -84,14 +116,24 @@ export class OpenRouterProvider {
         const timer = setTimeout(() => controller.abort(), this.timeoutMs);
         const startTime = Date.now();
 
+        console.log(JSON.stringify({
+          level: 'info',
+          event: 'provider_request_started',
+          provider: 'openrouter',
+          model,
+          attempt: attempts + 1,
+          maxRetries: MAX_RETRY_COUNT,
+          requestId
+        }));
+
         try {
           const response = await this.fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${this.apiKey}`,
-              'HTTP-Referer': 'https://nimo-core.local',
-              'X-Title': 'NIMO Core',
+              'HTTP-Referer': this.appUrl,
+              'X-Title': this.appName,
               ...(requestId ? { 'X-Request-ID': requestId } : {})
             },
             body: JSON.stringify({
@@ -107,29 +149,119 @@ export class OpenRouterProvider {
 
           if (!response.ok) {
             const status = response.status;
+            const errorType = classifyHttpError(status);
+            let errorDetails = `HTTP ${status}`;
+            try {
+              const errBody = await response.json();
+              if (errBody?.error?.message) {
+                errorDetails = String(errBody.error.message);
+              }
+            } catch {
+              // Ignore non-JSON error bodies
+            }
+
+            console.error(JSON.stringify({
+              level: 'error',
+              event: 'provider_http_error',
+              provider: 'openrouter',
+              model,
+              status,
+              errorType,
+              errorDetails,
+              attempt: attempts + 1,
+              requestId
+            }));
+
             if (isRetryableStatus(status) && attempts < MAX_RETRY_COUNT) {
               attempts++;
               await new Promise(r => setTimeout(r, 400 * attempts));
               continue;
             }
-            errors.push({ model, status, message: `HTTP ${status}` });
+            errors.push({ model, status, errorType, message: errorDetails });
             break; // Try next model in failover chain
           }
 
-          const data = await response.json();
-          const content = data?.choices?.[0]?.message?.content;
+          console.log(JSON.stringify({
+            level: 'info',
+            event: 'provider_http_status_ok',
+            provider: 'openrouter',
+            model,
+            status: response.status,
+            requestId
+          }));
 
-          if (typeof content !== 'string' || !content.trim()) {
-            errors.push({ model, message: 'Empty or malformed choice content' });
+          let data;
+          try {
+            data = await response.json();
+          } catch (parseErr) {
+            console.error(JSON.stringify({
+              level: 'error',
+              event: 'provider_json_parse_error',
+              provider: 'openrouter',
+              model,
+              errorType: 'INVALID_JSON_RESPONSE',
+              errorMessage: parseErr.message,
+              requestId
+            }));
+            errors.push({ model, status: response.status, errorType: 'INVALID_JSON_RESPONSE', message: parseErr.message });
+            break;
+          }
+
+          if (data?.error) {
+            const apiMsg = data.error.message || 'API error returned inside 200 payload';
+            console.error(JSON.stringify({
+              level: 'error',
+              event: 'provider_api_error_in_body',
+              provider: 'openrouter',
+              model,
+              errorType: 'API_ERROR_IN_BODY',
+              errorDetails: apiMsg,
+              requestId
+            }));
+            errors.push({ model, status: response.status, errorType: 'API_ERROR_IN_BODY', message: apiMsg });
+            break;
+          }
+
+          const rawContent = data?.choices?.[0]?.message?.content;
+          let content = '';
+          if (typeof rawContent === 'string') {
+            content = rawContent;
+          } else if (Array.isArray(rawContent)) {
+            content = rawContent
+              .filter(part => part && (part.type === 'text' || typeof part.text === 'string'))
+              .map(part => part.text || '')
+              .join('\n');
+          }
+
+          if (!content || !content.trim()) {
+            console.error(JSON.stringify({
+              level: 'error',
+              event: 'provider_empty_content',
+              provider: 'openrouter',
+              model,
+              errorType: 'EMPTY_CHOICE_CONTENT',
+              requestId
+            }));
+            errors.push({ model, errorType: 'EMPTY_CHOICE_CONTENT', message: 'Empty or malformed choice content' });
             break; // Try next model
           }
 
           const sanitizedReply = sanitizeModelOutput(content);
           const latencyMs = Date.now() - startTime;
 
+          console.log(JSON.stringify({
+            level: 'info',
+            event: 'provider_completion_success',
+            provider: 'openrouter',
+            model: data.model || model,
+            replyLength: sanitizedReply.length,
+            latencyMs,
+            requestId
+          }));
+
           return {
             success: true,
-            reply: sanitizedReply,
+            reply: sanitizedReply || content.trim(),
             model: data.model || model,
             source: 'openrouter',
             latencyMs,
@@ -138,7 +270,20 @@ export class OpenRouterProvider {
         } catch (err) {
           clearTimeout(timer);
           const isAbort = err.name === 'AbortError';
-          errors.push({ model, message: isAbort ? 'Request timeout' : 'Network failure' });
+          const errorType = isAbort ? 'REQUEST_TIMEOUT' : 'NETWORK_FAILURE';
+
+          console.error(JSON.stringify({
+            level: 'error',
+            event: 'provider_fetch_exception',
+            provider: 'openrouter',
+            model,
+            errorType,
+            errorMessage: err.message,
+            attempt: attempts + 1,
+            requestId
+          }));
+
+          errors.push({ model, errorType, message: isAbort ? 'Request timeout' : 'Network failure' });
           if (attempts < MAX_RETRY_COUNT && !isAbort) {
             attempts++;
             await new Promise(r => setTimeout(r, 300 * attempts));
@@ -150,6 +295,16 @@ export class OpenRouterProvider {
     }
 
     // All models failed in failover chain
+    console.error(JSON.stringify({
+      level: 'error',
+      event: 'provider_all_models_failed',
+      provider: 'openrouter',
+      modelsAttempted: this.models,
+      errorCount: errors.length,
+      errors: errors.map(e => ({ model: e.model, status: e.status, errorType: e.errorType, message: e.message })),
+      requestId
+    }));
+
     return {
       success: false,
       reply: 'I could not reach the AI service at this moment. Please try again.',

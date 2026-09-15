@@ -362,23 +362,67 @@ export function createServer({
         const response = nimoEngine.respond(message, context);
 
         // If deterministic response was fallback and AI is configured, attempt remote fallback
-        if (response.intent === 'fallback' && provider?.apiKey) {
-          const aiResult = await provider.complete({
-            messages: [{ role: 'user', content: message }],
-            requestId
-          });
-
-          if (aiResult.success) {
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({
-              success: true,
-              reply: aiResult.reply,
-              model: aiResult.model,
-              source: 'openrouter',
-              actions: aiResult.actions || [],
-              context: response.context
+        if (response.intent === 'fallback') {
+          if (!provider?.apiKey) {
+            console.warn(JSON.stringify({
+              level: 'warn',
+              event: 'ai_fallback_skipped',
+              reason: 'OPENROUTER_API_KEY not configured',
+              requestId,
+              intent: response.intent
             }));
-            return;
+          } else {
+            console.log(JSON.stringify({
+              level: 'info',
+              event: 'ai_fallback_started',
+              requestId,
+              models: provider.models
+            }));
+
+            try {
+              const aiResult = await provider.complete({
+                messages: [{ role: 'user', content: message }],
+                requestId
+              });
+
+              if (aiResult.success) {
+                console.log(JSON.stringify({
+                  level: 'info',
+                  event: 'ai_fallback_completed',
+                  model: aiResult.model,
+                  latencyMs: aiResult.latencyMs,
+                  requestId
+                }));
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                  success: true,
+                  reply: aiResult.reply,
+                  model: aiResult.model,
+                  source: 'openrouter',
+                  actions: aiResult.actions || [],
+                  context: response.context
+                }));
+                return;
+              } else {
+                console.warn(JSON.stringify({
+                  level: 'warn',
+                  event: 'ai_fallback_failed',
+                  error: aiResult.error,
+                  requestId,
+                  fallbackToDeterministic: true
+                }));
+              }
+            } catch (providerErr) {
+              console.error(JSON.stringify({
+                level: 'error',
+                event: 'ai_fallback_exception',
+                errorType: 'UNCAUGHT_PROVIDER_EXCEPTION',
+                errorMessage: providerErr.message,
+                requestId,
+                fallbackToDeterministic: true
+              }));
+            }
           }
         }
 

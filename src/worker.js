@@ -374,29 +374,84 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
     const response = nimoEngine.respond(message, context);
 
     // If deterministic response was fallback and AI is configured, attempt remote fallback
-    const apiKey = env.OPENROUTER_API_KEY || (globalThis.process?.env?.OPENROUTER_API_KEY);
-    if (response.intent === 'fallback' && (apiKey || options.aiProvider)) {
-      const provider = options.aiProvider || createOpenRouterProvider({
-        apiKey,
-        models: env.OPENROUTER_MODELS ? env.OPENROUTER_MODELS.split(',').map(m => m.trim()) : undefined,
-        timeoutMs: env.PROVIDER_TIMEOUT_MS ? Number(env.PROVIDER_TIMEOUT_MS) : undefined
-      });
+    const apiKey = (typeof env.OPENROUTER_API_KEY === 'string' && env.OPENROUTER_API_KEY.trim()) ||
+      (typeof globalThis.process?.env?.OPENROUTER_API_KEY === 'string' && globalThis.process.env.OPENROUTER_API_KEY.trim()) ||
+      null;
 
-      if (provider?.apiKey) {
-        const aiResult = await provider.complete({
-          messages: [{ role: 'user', content: message }],
-          requestId
+    if (response.intent === 'fallback') {
+      if (!apiKey && !options.aiProvider) {
+        console.warn(JSON.stringify({
+          level: 'warn',
+          event: 'ai_fallback_skipped',
+          reason: 'OPENROUTER_API_KEY not configured in environment',
+          requestId,
+          intent: response.intent
+        }));
+      } else {
+        const models = env.OPENROUTER_MODELS
+          ? env.OPENROUTER_MODELS.split(',').map(m => m.trim()).filter(Boolean)
+          : undefined;
+        const timeoutMs = env.PROVIDER_TIMEOUT_MS ? Number(env.PROVIDER_TIMEOUT_MS) : undefined;
+        const appUrl = env.PUBLIC_APP_URL || 'https://manavagarwal.me';
+
+        const provider = options.aiProvider || createOpenRouterProvider({
+          apiKey,
+          models,
+          timeoutMs,
+          appUrl
         });
 
-        if (aiResult.success) {
-          return jsonResponse({
-            success: true,
-            reply: aiResult.reply,
-            model: aiResult.model,
-            source: 'openrouter',
-            actions: aiResult.actions || [],
-            context: response.context
-          }, 200, corsHeaders);
+        if (provider?.apiKey || options.aiProvider) {
+          console.log(JSON.stringify({
+            level: 'info',
+            event: 'ai_fallback_started',
+            requestId,
+            models: provider.models || models || 'default',
+            hasApiKey: Boolean(provider?.apiKey)
+          }));
+
+          try {
+            const aiResult = await provider.complete({
+              messages: [{ role: 'user', content: message }],
+              requestId
+            });
+
+            if (aiResult?.success) {
+              console.log(JSON.stringify({
+                level: 'info',
+                event: 'ai_fallback_completed',
+                model: aiResult.model,
+                latencyMs: aiResult.latencyMs,
+                requestId
+              }));
+
+              return jsonResponse({
+                success: true,
+                reply: aiResult.reply,
+                model: aiResult.model,
+                source: 'openrouter',
+                actions: aiResult.actions || [],
+                context: response.context
+              }, 200, corsHeaders);
+            } else {
+              console.warn(JSON.stringify({
+                level: 'warn',
+                event: 'ai_fallback_failed',
+                error: aiResult?.error || 'UNKNOWN_PROVIDER_ERROR',
+                requestId,
+                fallbackToDeterministic: true
+              }));
+            }
+          } catch (providerErr) {
+            console.error(JSON.stringify({
+              level: 'error',
+              event: 'ai_fallback_exception',
+              errorType: 'UNCAUGHT_PROVIDER_EXCEPTION',
+              errorMessage: providerErr.message,
+              requestId,
+              fallbackToDeterministic: true
+            }));
+          }
         }
       }
     }
