@@ -44,12 +44,29 @@ export function classifyHttpError(status) {
   return 'HTTP_CLIENT_ERROR';
 }
 
+/**
+ * Safe fetch resolver ensuring global fetch is called with globalThis context
+ * while preserving test dependency injection.
+ * In Cloudflare Workers (workerd runtime), calling global fetch with an incorrect
+ * receiver (e.g. `this.fetch()` where `this` is an OpenRouterProvider instance)
+ * throws "TypeError: Illegal invocation: function called with incorrect `this` reference".
+ */
+export function resolveFetch(fetchFn) {
+  if (typeof fetchFn === 'function') {
+    if (typeof globalThis.fetch === 'function' && fetchFn === globalThis.fetch) {
+      return (url, init) => globalThis.fetch(url, init);
+    }
+    return (url, init) => fetchFn(url, init);
+  }
+  return (url, init) => globalThis.fetch(url, init);
+}
+
 export class OpenRouterProvider {
   constructor({
     apiKey = globalThis.process?.env?.OPENROUTER_API_KEY || null,
     models = null,
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    fetchFn = globalThis.fetch,
+    fetchFn = null,
     appUrl = 'https://manavagarwal.me',
     appName = 'NIMO Core'
   } = {}) {
@@ -60,7 +77,7 @@ export class OpenRouterProvider {
           ? globalThis.process.env.OPENROUTER_MODELS.split(',').map(m => m.trim()).filter(Boolean)
           : DEFAULT_MODELS);
     this.timeoutMs = timeoutMs;
-    this.fetch = fetchFn;
+    this.fetch = resolveFetch(fetchFn);
     this.appUrl = appUrl;
     this.appName = appName;
   }

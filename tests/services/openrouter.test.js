@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   OpenRouterProvider,
   createOpenRouterProvider,
-  sanitizeModelOutput
+  sanitizeModelOutput,
+  resolveFetch
 } from '../../src/services/openrouter.js';
 
 test('sanitizeModelOutput strips reasoning and think blocks', () => {
@@ -181,4 +182,94 @@ test('OpenRouter detects and fails on API error object inside 200 response', asy
   const result = await provider.complete({ messages: [{ role: 'user', content: 'hi' }] });
   assert.equal(result.success, false);
   assert.equal(result.error, 'ALL_MODELS_FAILED');
+});
+
+test('resolveFetch normalizes custom functions and globalThis.fetch properly', () => {
+  const originalFetch = globalThis.fetch;
+  let receivedThis = null;
+
+  globalThis.fetch = function () {
+    receivedThis = this;
+    return 'ok';
+  };
+
+  try {
+    const fnDefault = resolveFetch();
+    assert.equal(typeof fnDefault, 'function');
+    assert.equal(fnDefault(), 'ok');
+    assert.equal(receivedThis, globalThis);
+
+    receivedThis = null;
+    const fnGlobal = resolveFetch(globalThis.fetch);
+    assert.equal(fnGlobal(), 'ok');
+    assert.equal(receivedThis, globalThis);
+
+    const customFn = (a, b) => `${a}-${b}`;
+    const fnCustom = resolveFetch(customFn);
+    assert.equal(fnCustom('foo', 'bar'), 'foo-bar');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('OpenRouter invokes injected fetchFn without leaking OpenRouterProvider instance context', async () => {
+  let receiverContext = 'not_called';
+  const mockFetch = function (url, opts) {
+    receiverContext = this;
+    if (this instanceof OpenRouterProvider) {
+      throw new TypeError('Illegal invocation: function called with incorrect `this` reference.');
+    }
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        model: 'google/gemini-2.5-flash',
+        choices: [{ message: { content: 'Success without instance leakage' } }]
+      })
+    });
+  };
+
+  const provider = new OpenRouterProvider({
+    apiKey: 'test-key',
+    fetchFn: mockFetch
+  });
+
+  const result = await provider.complete({ messages: [{ role: 'user', content: 'hello' }] });
+  assert.equal(result.success, true);
+  assert.equal(result.reply, 'Success without instance leakage');
+  assert.notEqual(receiverContext, provider);
+});
+
+test('OpenRouter default fetch preserves globalThis context and avoids illegal invocation', async () => {
+  const originalFetch = globalThis.fetch;
+  let receiverContext = null;
+
+  globalThis.fetch = function (url, opts) {
+    receiverContext = this;
+    if (this !== globalThis) {
+      throw new TypeError('Illegal invocation: function called with incorrect `this` reference.');
+    }
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        model: 'google/gemini-2.5-flash',
+        choices: [{ message: { content: 'Success with global receiver' } }]
+      })
+    });
+  };
+
+  try {
+    const provider = new OpenRouterProvider({
+      apiKey: 'test-key'
+      // fetchFn omitted to test default resolver behavior
+    });
+
+    const result = await provider.complete({ messages: [{ role: 'user', content: 'hello' }] });
+    assert.equal(result.success, true);
+    assert.equal(result.reply, 'Success with global receiver');
+    assert.equal(receiverContext, globalThis);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
