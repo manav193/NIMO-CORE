@@ -1,120 +1,209 @@
-# NIMO Core
+# NIMO-CORE
 
-NIMO Core is the standalone intelligence and integration layer for Manav Agarwal's public project ecosystem.
+Framework-free, zero-dependency, local-first intelligence and federation core for NIMO integrations.
 
-![NIMO assistant and hybrid architecture](https://raw.githubusercontent.com/manav193/MY-PORTFOLIO/main/frontend/images/nimo-preview.svg)
+NIMO-CORE owns persona, multilingual language detection, normalized knowledge, entity matching, follow-up context resolution, response construction, and structured actions. Hosts own DOM, browser navigation, audio, modals, remote AI credentials, and secrets.
 
-[View the full NIMO architecture case study](https://manavagarwal.me/project-nimo.html)
+---
 
-**Current production version:** `1.1.0`
-
-## Why it exists
-
-NIMO began as a portfolio-aware assistant. Moving intelligence into a standalone Cloudflare Worker separates presentation from project knowledge, validation, provider access, conversation handling, caching, and observability. The portfolio retains its native assistant UI while NIMO Core becomes independently deployable and testable.
-
-## Responsibilities
-
-- Canonical public project knowledge
-- Deterministic technology ownership and named-project comparisons
-- Bounded multi-turn conversation context
-- OpenRouter model routing and ordered failover
-- Reasoning-leak and truncated-response protection
-- Strict input, context, history, and origin validation
-- Short-lived response caching for stateless queries
-- Request IDs, telemetry, health checks, and safe public errors
-- Optional Cloudflare distributed rate limiting
-
-Private and excluded projects are not indexed, acknowledged, summarized, or promoted.
-
-## Request flow
+## Architecture
 
 ```text
-Portfolio or future public client
-              |
-         Native NIMO UI
-              |
-          NIMO Core
- Validation | Knowledge | Deterministic facts | Cache
-              |
-     Controlled provider failover
++-------------------------------------------------------------------------+
+|                               Host Application                          |
+|             (MY-PORTFOLIO / Arcade OS / ToolVerse / Custom Host)        |
++-------------------------------------------------------------------------+
+                                    |
+            +-----------------------+-----------------------+
+            |                                               |
+            v                                               v
++-----------------------+                       +-----------------------+
+|  Deterministic Engine |                       |   HTTP Local Server   |
+|   (src/core/nimo-     |                       |    (src/server/       |
+|       engine.js)      |                       |       server.js)      |
++-----------------------+                       +-----------------------+
+| - Language Detection  |                       | - Port: 8787 (default)|
+| - Entity Matching     |                       | - GET /api/health     |
+| - Intent Routing      |                       | - POST /api/nimo/chat |
+| - Context Resolution  |                       | - POST /v1/chat       |
+| - Response Building   |                       | - In-Memory Rate Limit|
+| - Unexecuted Actions  |                       | - Strict CORS         |
++-----------------------+                       | - Security Headers    |
+            |                                   +-----------------------+
+            +-----------------------+                       |
+                                    |                       v
+                                    |           +-----------------------+
+                                    +---------> | Optional AI Fallback  |
+                                                |   (OpenRouter Client) |
+                                                +-----------------------+
+                                                | - Model Failover      |
+                                                | - Abort Timeout (10s) |
+                                                | - Transient Retries   |
+                                                | - Output Sanitization |
+                                                +-----------------------+
 ```
 
-Known portfolio facts and comparisons can resolve deterministically. Complex or conversational requests use validated history and controlled provider failover.
+### Architectural Principles
+1. **Zero External Dependencies**: Pure ESM, runs natively in Node.js (>=18) and modern browser runtimes.
+2. **Deterministic by Default**: `NimoEngine.respond()` is synchronous, deterministic, and returns unexecuted actions (`executed: false`).
+3. **Strict Isolation**: Integrations or adapters never crash the core runtime.
+4. **Security & Zero Leakage**: API keys, internal reasoning, and stack traces are never exposed in responses or logs.
 
-## Production endpoint
+---
 
-```text
-https://nimo-core.manav-nimo.workers.dev
+## API Endpoints
+
+The local HTTP server listens by default at `http://localhost:8787`.
+
+### 1. Health Check
+```http
+GET /api/health
 ```
-
-## API
-
-- `GET /api/health`
-- `POST /api/nimo/chat`
-- `POST /v1/chat`
-
-Example payload:
-
+**Response (200 OK):**
 ```json
 {
-  "message": "Compare ToolVerse and SHIFT-ZERO",
-  "context": {
-    "projectId": "portfolio",
-    "pageId": "home",
-    "sectionId": "work",
-    "language": "en"
-  },
-  "history": []
+  "status": "ok",
+  "version": "0.2.0",
+  "runtime": "node",
+  "uptime": 124,
+  "timestamp": "2026-09-15T08:00:00.000Z"
 }
 ```
 
-History is validated and bounded to the latest supported turns. Arbitrary client context is never inserted into the system prompt without validation.
+### 2. Chat Query
+```http
+POST /api/nimo/chat
+Content-Type: application/json
+```
+*(Compatibility alias: `POST /v1/chat`)*
 
-## Local development
+**Request Payload:**
+```json
+{
+  "message": "Who are you?",
+  "history": [],
+  "context": {
+    "projectId": "nimo",
+    "currentPage": "home",
+    "language": "en"
+  }
+}
+```
 
+**Response (200 OK):**
+```json
+{
+  "success": true,
+  "reply": "I am NIMO, a local-first project intelligence and navigation companion.",
+  "model": "identity",
+  "source": "core",
+  "actions": [],
+  "recommendations": [],
+  "context": {
+    "projectId": "nimo",
+    "currentPage": "home",
+    "currentSection": null,
+    "lastIntent": "identity",
+    "followUp": false
+  }
+}
+```
+
+---
+
+## Local Development & Setup
+
+### 1. Environment Configuration
+Copy `.env.example` to `.env`:
 ```bash
-git clone https://github.com/manav193/NIMO-CORE.git
-cd NIMO-CORE
-npm install
-npm run lint
-npm test
+cp .env.example .env
+```
+
+Configuration parameters:
+- `PORT`: HTTP port (default `8787`).
+- `ALLOWED_ORIGINS`: Comma-separated CORS origins (default: localhost ports 8787, 3000, 5173, 5500).
+- `RATE_LIMIT_PER_MINUTE`: Per-client rate limit threshold (default: `60`).
+- `OPENROUTER_API_KEY`: Optional OpenRouter API key for remote AI fallback.
+- `OPENROUTER_MODELS`: Comma-separated failover model list (default: `google/gemini-2.5-flash,meta-llama/llama-3.3-70b-instruct`).
+
+For Cloudflare / Wrangler local development, `.dev.vars.example` is also provided.
+
+### 2. Running Locally
+```bash
+# Start local API server on http://localhost:8787
 npm run dev
 ```
 
-Configure the provider key as a Cloudflare secret:
+---
+
+## Testing & Quality Commands
 
 ```bash
-npx wrangler secret put OPENROUTER_API_KEY
+# Run complete test suite (node --test)
+npm test
+
+# Check syntax and module imports across all JS files
+npm run lint
+
+# Run lint + test suite together
+npm run check
+
+# Run end-to-end local server smoke test
+npm run smoke
+
+# Sync generated browser modules to MY-PORTFOLIO
+npm run sync:portfolio
+
+# Sync event contract to ToolVerse
+npm run sync:toolverse
 ```
 
-Deploy only after lint, tests, and smoke checks pass:
+---
 
-```bash
-npm run deploy
+## Project Structure
+
+```text
+.
+├── .github/workflows/ci.yml       # Multi-version Node.js CI matrix
+├── .env.example                   # Local server configuration template
+├── .dev.vars.example              # Wrangler local secrets template
+├── docs/                          # Architecture, federation, and schema docs
+├── examples/                      # Arcade OS and ToolVerse reference integrations
+├── schemas/                       # JSON Schema for module manifests
+├── scripts/
+│   ├── lint.mjs                   # Zero-dependency syntax validator
+│   ├── smoke-test.mjs             # Automated server smoke test
+│   ├── sync-portfolio.mjs         # Portfolio synchronizer
+│   └── sync-toolverse.mjs         # ToolVerse synchronizer
+├── shared/
+│   ├── adaptive/                  # Adaptive session, UI, and idle controller
+│   └── fabric/                    # Responsive canvas graphics fabric
+├── src/
+│   ├── adapters/                  # Arcade OS, ToolVerse, generic adapters
+│   ├── adaptive/                  # Adaptive session schema and validation
+│   ├── core/                      # NimoEngine, IntentRouter, EntityMatcher, etc.
+│   ├── federation/                # Manifest schemas, module registry, events
+│   ├── integrations/              # BrowserClient with isolated remote fallback
+│   ├── knowledge/                 # Knowledge registry and sources
+│   ├── server/                    # HTTP server (health, chat, rate limit, CORS)
+│   ├── services/                  # OpenRouter client (failover, retries, timeout)
+│   ├── utils/                     # Normalization, scoring, validation
+│   └── index.js                   # Primary package entry point
+└── tests/                         # Unit, security, API, and integration tests
 ```
 
-## v1.1 features
+---
 
-- Deterministic technology ownership answers
-- Deterministic named-project comparisons
-- Versioned response-cache namespace
-- Chat source and latency telemetry
-- Provider success and failure telemetry
-- Reasoning-output exclusion and leak detection
-- Incomplete-response rejection and automatic failover
+## Security Model
 
-## Security notes
+- **Zero Secret Leakage**: API keys and internal errors are never exposed in public responses or logs.
+- **Prototype Pollution Defense**: `assertPlainObject` enforces plain object prototypes and rejects `__proto__`, `constructor`, and `prototype` keys. `sanitizeObject` strips unsafe keys.
+- **Strict CORS & Headers**: Rejects unauthorized origins, applies `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Bounded Inputs**: Enforces 64 KB HTTP body limit and 8 KB query bounds to prevent ReDoS and memory exhaustion.
+- **Rate Limiting**: Sliding window rate limiting with automatic pruning and `Retry-After` headers.
+- **Safe AI Output**: Strips reasoning blocks (`<think>...</think>`) and enforces schema validation before returning responses.
 
-- Provider credentials never enter browser-delivered code.
-- CORS uses an explicit origin allowlist.
-- Browser-facing errors do not expose provider details.
-- Request history, message size, language, page, and project values are validated.
-- In-memory rate limiting is only a local fallback; distributed rate limiting is preferred in production.
+---
 
-## Integration
-
-The visible local-first client is maintained in [MY-PORTFOLIO](https://github.com/manav193/MY-PORTFOLIO), with the public portfolio at [manavagarwal.me](https://manavagarwal.me).
-
-## Release
-
-The first stable production release is tagged `v1.0.0`; the current main branch contains the v1.1 production improvements documented above.
+## License
+MIT

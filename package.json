@@ -1,21 +1,35 @@
 {
-  "name": "nimo-core",
-  "version": "1.1.0",
-  "private": true,
+  "name": "@nimo/core",
+  "version": "0.2.0",
+  "description": "Framework-free, deterministic intelligence core for NIMO integrations.",
   "type": "module",
-  "description": "Standalone intelligence and integration layer for NIMO.",
-  "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "lint": "eslint ."
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.js",
+    "./adapters/arcade-os": "./src/adapters/arcade-os-adapter.js",
+    "./adapters/toolverse": "./src/adapters/toolverse-adapter.js",
+    "./adapters/generic": "./src/adapters/generic-project-adapter.js",
+    "./browser-client": "./src/integrations/browser-client.js",
+    "./schema": "./src/knowledge/schema.js",
+    "./federation": "./src/federation/project-federation.js",
+    "./federation/schema": "./src/federation/manifest-schema.js",
+    "./federation/events": "./src/federation/project-events.js",
+    "./adaptive/schema": "./src/adaptive/session-context.js",
+    "./services/openrouter": "./src/services/openrouter.js",
+    "./server": "./src/server/server.js",
+    "./project-manifest.schema.json": "./schemas/project-manifest.schema.json"
   },
-  "devDependencies": {
-    "@eslint/js": "^9.0.0",
-    "eslint": "^9.0.0",
-    "globals": "^15.0.0",
-    "vitest": "^2.1.0",
-    "wrangler": "^4.0.0"
-  }
+  "scripts": {
+    "dev": "node src/server/server.js",
+    "test": "node --test tests/**/*.test.js tests/*.test.js",
+    "lint": "node scripts/lint.mjs",
+    "check": "node scripts/lint.mjs && node --test tests/**/*.test.js tests/*.test.js",
+    "smoke": "node scripts/smoke-test.mjs",
+    "sync:portfolio": "node scripts/sync-portfolio.mjs",
+    "sync:toolverse": "node scripts/sync-toolverse.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
 }

@@ -1,0 +1,5 @@
+# Cloudflare Wrangler Local Variables Example
+# Copy to .dev.vars for Wrangler local development
+OPENROUTER_API_KEY=your_key_here
+OPENROUTER_MODELS=google/gemini-2.5-flash,meta-llama/llama-3.3-70b-instruct
+PORT=8787

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://nimo.dev/schemas/project-manifest.schema.json",
+  "title": "NIMO Ecosystem Module Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "version", "type", "description", "entry", "knowledge", "status"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?$" },
+    "type": { "type": "string", "minLength": 1 },
+    "description": { "type": "string", "minLength": 1 },
+    "icon": { "type": "string" },
+    "entry": { "type": "string", "minLength": 1 },
+    "knowledge": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["experimental", "beta", "stable", "maintenance", "retired"] },
+    "capabilities": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "keywords": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "relatedModules": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "navigation": { "type": "object", "additionalProperties": { "type": "string", "minLength": 1 } },
+    "metadata": { "type": "object" }
+  }
+}
