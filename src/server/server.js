@@ -52,6 +52,132 @@ class RateLimiter {
   }
 }
 
+const DASHBOARD_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NIMO-CORE • Local Server</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card: #131a2a;
+      --border: #1e293b;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --accent-hover: #0ea5e9;
+      --green: #22c55e;
+      --code-bg: #0b1120;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 2rem 1rem; line-height: 1.5; min-height: 100vh; display: flex; justify-content: center; }
+    .container { max-width: 800px; width: 100%; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+    .title { display: flex; align-items: center; gap: 0.75rem; }
+    .title h1 { font-size: 1.5rem; font-weight: 700; }
+    .badge { background: rgba(34, 197, 94, 0.15); color: var(--green); border: 1px solid rgba(34, 197, 94, 0.3); padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.4rem; }
+    .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .card h2 { font-size: 1.1rem; margin-bottom: 1rem; color: var(--accent); }
+    .endpoints { display: grid; gap: 0.5rem; }
+    .endpoint-item { display: flex; align-items: center; justify-content: space-between; background: var(--code-bg); padding: 0.6rem 1rem; border-radius: 6px; border: 1px solid var(--border); }
+    .method { font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.4rem; border-radius: 4px; }
+    .get { background: rgba(56, 189, 248, 0.2); color: var(--accent); }
+    .post { background: rgba(34, 197, 94, 0.2); color: var(--green); }
+    .endpoint-path { font-family: monospace; font-size: 0.9rem; margin-left: 0.5rem; }
+    .interactive-form { display: flex; flex-direction: column; gap: 1rem; }
+    .input-row { display: flex; gap: 0.5rem; }
+    input[type="text"] { flex: 1; background: var(--code-bg); border: 1px solid var(--border); color: var(--text); padding: 0.75rem 1rem; border-radius: 8px; font-size: 0.95rem; outline: none; }
+    input[type="text"]:focus { border-color: var(--accent); }
+    button { background: var(--accent); color: #090d16; font-weight: 600; border: none; padding: 0.75rem 1.25rem; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+    button:hover { background: var(--accent-hover); }
+    .pills { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .pill { background: var(--code-bg); border: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+    .pill:hover { border-color: var(--accent); color: var(--text); }
+    pre { background: var(--code-bg); border: 1px solid var(--border); padding: 1rem; border-radius: 8px; font-family: monospace; font-size: 0.85rem; overflow-x: auto; color: #cbd5e1; min-height: 80px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="title">
+        <h1>NIMO-CORE</h1>
+        <span class="badge">Running</span>
+      </div>
+      <div style="font-size: 0.85rem; color: var(--muted);">Node.js v0.2.0</div>
+    </header>
+
+    <div class="card">
+      <h2>Live Query Console</h2>
+      <div class="interactive-form">
+        <div class="input-row">
+          <input type="text" id="queryInput" placeholder="Ask NIMO anything..." value="Who are you?" />
+          <button id="sendBtn" onclick="sendQuery()">Send Query</button>
+        </div>
+        <div class="pills">
+          <span style="font-size: 0.8rem; color: var(--muted); align-self: center;">Quick test:</span>
+          <button class="pill" onclick="setQuery('Who are you?')">Who are you?</button>
+          <button class="pill" onclick="setQuery('Tell me about SHIFT-ZERO')">Tell me about SHIFT-ZERO</button>
+          <button class="pill" onclick="setQuery('ToolVerse ke baare mein batao')">ToolVerse ke baare mein batao</button>
+          <button class="pill" onclick="setQuery('Which tool can compress images?')">Compress images</button>
+        </div>
+        <pre id="outputView">Click 'Send Query' to test NIMO response...</pre>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Available Endpoints</h2>
+      <div class="endpoints">
+        <div class="endpoint-item">
+          <div><span class="method get">GET</span><span class="endpoint-path"><a href="/api/health" style="color: inherit; text-decoration: none;">/api/health</a></span></div>
+          <span style="color: var(--muted); font-size: 0.8rem;">Health & uptime check</span>
+        </div>
+        <div class="endpoint-item">
+          <div><span class="method post">POST</span><span class="endpoint-path">/api/nimo/chat</span></div>
+          <span style="color: var(--muted); font-size: 0.8rem;">Core intelligence & AI fallback</span>
+        </div>
+        <div class="endpoint-item">
+          <div><span class="method post">POST</span><span class="endpoint-path">/v1/chat</span></div>
+          <span style="color: var(--muted); font-size: 0.8rem;">Compatibility alias</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setQuery(q) {
+      document.getElementById('queryInput').value = q;
+      sendQuery();
+    }
+    async function sendQuery() {
+      const input = document.getElementById('queryInput').value.trim();
+      const output = document.getElementById('outputView');
+      const btn = document.getElementById('sendBtn');
+      if (!input) return;
+      btn.disabled = true;
+      btn.innerText = 'Sending...';
+      output.innerText = 'Processing query...';
+      try {
+        const res = await fetch('/api/nimo/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: input })
+        });
+        const data = await res.json();
+        output.innerText = JSON.stringify(data, null, 2);
+      } catch (err) {
+        output.innerText = 'Error: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'Send Query';
+      }
+    }
+  </script>
+</body>
+</html>`;
+
+
 /**
  * Resolve allowed origins from environment.
  */
@@ -132,6 +258,33 @@ export function createServer({
 
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     const pathname = url.pathname;
+
+    // GET / (Developer Portal & Console)
+    if (pathname === '/') {
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Method Not Allowed' }));
+        return;
+      }
+      const accept = req.headers['accept'] || '';
+      if (accept.includes('application/json') && !accept.includes('text/html')) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          name: '@nimo/core',
+          status: 'ok',
+          version: '0.2.0',
+          endpoints: {
+            health: '/api/health',
+            chat: '/api/nimo/chat',
+            chat_alias: '/v1/chat'
+          }
+        }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(DASHBOARD_HTML);
+      return;
+    }
 
     // GET /api/health
     if (pathname === '/api/health') {
