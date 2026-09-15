@@ -79,7 +79,7 @@ Configured under the `"vars"` block in `wrangler.jsonc`:
 | :--- | :--- | :--- |
 | `ALLOWED_ORIGINS` | Comma-separated list of allowed CORS origins | `https://manavagarwal.me,http://localhost:8787` |
 | `PUBLIC_APP_URL` | Canonical client application URL | `https://manavagarwal.me` |
-| `OPENROUTER_MODELS` | Prioritized model list for AI failover | `google/gemini-2.5-flash,meta-llama/llama-3.3-70b-instruct` |
+| `OPENROUTER_MODELS` | Prioritized model list for AI failover | `openrouter/free` |
 | `PROVIDER_TIMEOUT_MS` | AI provider request timeout in ms | `7500` |
 
 ### Secrets

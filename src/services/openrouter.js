@@ -4,9 +4,9 @@
  * and zero secret leakage.
  */
 
-const DEFAULT_MODELS = [
-  'google/gemini-2.5-flash',
-  'meta-llama/llama-3.3-70b-instruct'
+export const DEFAULT_MODELS = [
+  'openrouter/free',
+  'google/gemma-4-26b-a4b-it:free'
 ];
 
 const DEFAULT_TIMEOUT_MS = 10000;
@@ -70,7 +70,9 @@ export class OpenRouterProvider {
     appUrl = 'https://manavagarwal.me',
     appName = 'NIMO Core'
   } = {}) {
-    this.apiKey = typeof apiKey === 'string' ? apiKey.trim() : null;
+    this.apiKey = typeof apiKey === 'string'
+      ? apiKey.trim().replace(/^["']|["']$/g, '')
+      : null;
     this.models = models && models.length
       ? models
       : (globalThis.process?.env?.OPENROUTER_MODELS
@@ -167,14 +169,31 @@ export class OpenRouterProvider {
           if (!response.ok) {
             const status = response.status;
             const errorType = classifyHttpError(status);
-            let errorDetails = `HTTP ${status}`;
+            let errorCode = null;
+            let errorMessage = `HTTP ${status}`;
+
             try {
-              const errBody = await response.json();
-              if (errBody?.error?.message) {
-                errorDetails = String(errBody.error.message);
+              const rawBody = await response.text();
+              if (rawBody && rawBody.trim()) {
+                try {
+                  const errJson = JSON.parse(rawBody);
+                  if (errJson && typeof errJson === 'object') {
+                    if (errJson.error && typeof errJson.error === 'object') {
+                      if (errJson.error.code != null) errorCode = String(errJson.error.code);
+                      if (errJson.error.message) errorMessage = String(errJson.error.message);
+                    } else if (typeof errJson.error === 'string') {
+                      errorMessage = errJson.error;
+                    } else if (errJson.message) {
+                      errorMessage = String(errJson.message);
+                    }
+                  }
+                } catch {
+                  // Not JSON, capture clean truncated plain text
+                  errorMessage = rawBody.slice(0, 300).replace(/\s+/g, ' ').trim();
+                }
               }
             } catch {
-              // Ignore non-JSON error bodies
+              // Ignore body reading exceptions
             }
 
             console.error(JSON.stringify({
@@ -184,7 +203,9 @@ export class OpenRouterProvider {
               model,
               status,
               errorType,
-              errorDetails,
+              errorCode,
+              errorMessage,
+              errorDetails: errorMessage,
               attempt: attempts + 1,
               requestId
             }));
@@ -194,7 +215,7 @@ export class OpenRouterProvider {
               await new Promise(r => setTimeout(r, 400 * attempts));
               continue;
             }
-            errors.push({ model, status, errorType, message: errorDetails });
+            errors.push({ model, status, errorType, errorCode, message: errorMessage });
             break; // Try next model in failover chain
           }
 
@@ -220,22 +241,29 @@ export class OpenRouterProvider {
               errorMessage: parseErr.message,
               requestId
             }));
-            errors.push({ model, status: response.status, errorType: 'INVALID_JSON_RESPONSE', message: parseErr.message });
+            errors.push({ model, status: response.status, errorType: 'INVALID_JSON_RESPONSE', errorCode: null, message: parseErr.message });
             break;
           }
 
           if (data?.error) {
-            const apiMsg = data.error.message || 'API error returned inside 200 payload';
+            const apiMsg = typeof data.error === 'object' && data.error.message
+              ? String(data.error.message)
+              : (typeof data.error === 'string' ? data.error : 'API error returned inside 200 payload');
+            const apiCode = typeof data.error === 'object' && data.error.code != null
+              ? String(data.error.code)
+              : null;
+
             console.error(JSON.stringify({
               level: 'error',
               event: 'provider_api_error_in_body',
               provider: 'openrouter',
               model,
               errorType: 'API_ERROR_IN_BODY',
+              errorCode: apiCode,
               errorDetails: apiMsg,
               requestId
             }));
-            errors.push({ model, status: response.status, errorType: 'API_ERROR_IN_BODY', message: apiMsg });
+            errors.push({ model, status: response.status, errorType: 'API_ERROR_IN_BODY', errorCode: apiCode, message: apiMsg });
             break;
           }
 
@@ -318,7 +346,13 @@ export class OpenRouterProvider {
       provider: 'openrouter',
       modelsAttempted: this.models,
       errorCount: errors.length,
-      errors: errors.map(e => ({ model: e.model, status: e.status, errorType: e.errorType, message: e.message })),
+      errors: errors.map(e => ({
+        model: e.model,
+        status: e.status,
+        errorType: e.errorType,
+        errorCode: e.errorCode || null,
+        message: e.message
+      })),
       requestId
     }));
 

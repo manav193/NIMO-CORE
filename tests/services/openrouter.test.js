@@ -4,7 +4,8 @@ import {
   OpenRouterProvider,
   createOpenRouterProvider,
   sanitizeModelOutput,
-  resolveFetch
+  resolveFetch,
+  DEFAULT_MODELS
 } from '../../src/services/openrouter.js';
 
 test('sanitizeModelOutput strips reasoning and think blocks', () => {
@@ -272,4 +273,125 @@ test('OpenRouter default fetch preserves globalThis context and avoids illegal i
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('DEFAULT_MODELS contains openrouter/free and zero paid models', () => {
+  assert.ok(DEFAULT_MODELS.includes('openrouter/free'));
+  assert.ok(DEFAULT_MODELS.every(m => !m.includes('gemini')));
+  assert.ok(DEFAULT_MODELS.every(m => m === 'openrouter/free' || m.endsWith(':free')));
+});
+
+test('OpenRouter constructor strips quotes and whitespace from API key', () => {
+  const p1 = new OpenRouterProvider({ apiKey: '  "sk-or-v1-abc123"  ' });
+  assert.equal(p1.apiKey, 'sk-or-v1-abc123');
+
+  const p2 = new OpenRouterProvider({ apiKey: "'sk-or-v1-def456'" });
+  assert.equal(p2.apiKey, 'sk-or-v1-def456');
+});
+
+test('OpenRouter captures error.code and error.message from HTTP 400 response body', async () => {
+  let capturedLog = null;
+  const originalError = console.error;
+  console.error = (msg) => {
+    try {
+      const parsed = JSON.parse(msg);
+      if (parsed.event === 'provider_http_error') {
+        capturedLog = parsed;
+      }
+    } catch {}
+    originalError(msg);
+  };
+
+  const mockFetch = async () => ({
+    ok: false,
+    status: 400,
+    text: async () => JSON.stringify({
+      error: {
+        code: 400,
+        message: 'Cannot route to paid model with zero balance.'
+      }
+    })
+  });
+
+  try {
+    const provider = new OpenRouterProvider({
+      apiKey: 'test-key',
+      models: ['test-model'],
+      fetchFn: mockFetch
+    });
+
+    const result = await provider.complete({ messages: [{ role: 'user', content: 'test' }] });
+    assert.equal(result.success, false);
+    assert.equal(result.error, 'ALL_MODELS_FAILED');
+    assert.ok(capturedLog);
+    assert.equal(capturedLog.status, 400);
+    assert.equal(capturedLog.errorCode, '400');
+    assert.equal(capturedLog.errorMessage, 'Cannot route to paid model with zero balance.');
+  } finally {
+    console.error = originalError;
+  }
+});
+
+test('OpenRouter completes successfully with openrouter/free router', async () => {
+  const mockFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    assert.equal(body.model, 'openrouter/free');
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        model: 'openrouter/free',
+        choices: [{ message: { content: 'This is a free AI response from OpenRouter.' } }]
+      })
+    };
+  };
+
+  const provider = new OpenRouterProvider({
+    apiKey: 'test-key',
+    models: ['openrouter/free'],
+    fetchFn: mockFetch
+  });
+
+  const result = await provider.complete({ messages: [{ role: 'user', content: 'hello' }] });
+  assert.equal(result.success, true);
+  assert.equal(result.reply, 'This is a free AI response from OpenRouter.');
+  assert.equal(result.model, 'openrouter/free');
+  assert.equal(result.source, 'openrouter');
+});
+
+test('OpenRouter fails over from openrouter/free to explicit :free fallback model', async () => {
+  const attemptedModels = [];
+  const mockFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    attemptedModels.push(body.model);
+
+    if (body.model === 'openrouter/free') {
+      return {
+        ok: false,
+        status: 429,
+        text: async () => JSON.stringify({ error: { code: 429, message: 'Free router rate limited' } })
+      };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        model: 'google/gemma-4-26b-a4b-it:free',
+        choices: [{ message: { content: 'Response from explicit free fallback' } }]
+      })
+    };
+  };
+
+  const provider = new OpenRouterProvider({
+    apiKey: 'test-key',
+    models: ['openrouter/free', 'google/gemma-4-26b-a4b-it:free'],
+    fetchFn: mockFetch
+  });
+
+  const result = await provider.complete({ messages: [{ role: 'user', content: 'test failover' }] });
+  assert.equal(result.success, true);
+  assert.equal(result.reply, 'Response from explicit free fallback');
+  assert.equal(result.model, 'google/gemma-4-26b-a4b-it:free');
+  assert.deepEqual([...new Set(attemptedModels)], ['openrouter/free', 'google/gemma-4-26b-a4b-it:free']);
 });

@@ -124,7 +124,7 @@ Configuration parameters:
 - `ALLOWED_ORIGINS`: Comma-separated CORS origins (default: localhost ports 8787, 3000, 5173, 5500).
 - `RATE_LIMIT_PER_MINUTE`: Per-client rate limit threshold (default: `60`).
 - `OPENROUTER_API_KEY`: Optional OpenRouter API key for remote AI fallback.
-- `OPENROUTER_MODELS`: Comma-separated failover model list (default: `google/gemini-2.5-flash,meta-llama/llama-3.3-70b-instruct`).
+- `OPENROUTER_MODELS`: Comma-separated failover model list (default: `openrouter/free`).
 
 For Cloudflare / Wrangler local development, `.dev.vars.example` is also provided.
 
