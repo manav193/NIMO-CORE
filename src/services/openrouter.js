@@ -142,6 +142,8 @@ export class OpenRouterProvider {
           model,
           attempt: attempts + 1,
           maxRetries: MAX_RETRY_COUNT,
+          keyPrefix: this.apiKey ? `${this.apiKey.slice(0, 8)}...` : null,
+          keyLength: this.apiKey ? this.apiKey.length : 0,
           requestId
         }));
 
@@ -171,12 +173,14 @@ export class OpenRouterProvider {
             const errorType = classifyHttpError(status);
             let errorCode = null;
             let errorMessage = `HTTP ${status}`;
+            let rawBodyText = null;
+            let textError = null;
 
             try {
-              const rawBody = await response.text();
-              if (rawBody && rawBody.trim()) {
+              rawBodyText = await response.text();
+              if (rawBodyText && rawBodyText.trim()) {
                 try {
-                  const errJson = JSON.parse(rawBody);
+                  const errJson = JSON.parse(rawBodyText);
                   if (errJson && typeof errJson === 'object') {
                     if (errJson.error && typeof errJson.error === 'object') {
                       if (errJson.error.code != null) errorCode = String(errJson.error.code);
@@ -189,12 +193,26 @@ export class OpenRouterProvider {
                   }
                 } catch {
                   // Not JSON, capture clean truncated plain text
-                  errorMessage = rawBody.slice(0, 300).replace(/\s+/g, ' ').trim();
+                  errorMessage = rawBodyText.slice(0, 300).replace(/\s+/g, ' ').trim();
+                }
+              } else {
+                errorMessage = `HTTP ${status} (empty body)`;
+              }
+            } catch (err) {
+              textError = err.message;
+              errorMessage = `HTTP ${status} (body read error: ${err.message})`;
+            }
+
+            // Safe headers extraction without credentials
+            const safeHeaders = {};
+            try {
+              for (const [k, v] of response.headers.entries()) {
+                const lk = k.toLowerCase();
+                if (!lk.includes('cookie') && !lk.includes('auth') && !lk.includes('key')) {
+                  safeHeaders[lk] = v;
                 }
               }
-            } catch {
-              // Ignore body reading exceptions
-            }
+            } catch {}
 
             console.error(JSON.stringify({
               level: 'error',
@@ -202,9 +220,14 @@ export class OpenRouterProvider {
               provider: 'openrouter',
               model,
               status,
+              statusText: response.statusText,
+              url: response.url,
               errorType,
               errorCode,
               errorMessage,
+              rawBodySnippet: rawBodyText ? rawBodyText.slice(0, 300) : null,
+              textError,
+              responseHeaders: safeHeaders,
               errorDetails: errorMessage,
               attempt: attempts + 1,
               requestId
