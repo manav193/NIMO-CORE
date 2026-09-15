@@ -1,5 +1,15 @@
-# Cloudflare Wrangler Local Variables Example
-# Copy to .dev.vars for Wrangler local development
-OPENROUTER_API_KEY=your_key_here
+# Cloudflare Wrangler Local Development Variables Example
+# Copy this file to `.dev.vars` for local Wrangler development (`npx wrangler dev`).
+# Note: `.dev.vars` is gitignored and should never be committed with real secrets.
+
+# OpenRouter API Key for AI fallback (leave blank for 100% deterministic local mode)
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+
+# Comma-separated model list with automatic failover
 OPENROUTER_MODELS=google/gemini-2.5-flash,meta-llama/llama-3.3-70b-instruct
-PORT=8787
+
+# Provider timeout in milliseconds
+PROVIDER_TIMEOUT_MS=7500
+
+# Allowed CORS origins (comma-separated)
+ALLOWED_ORIGINS=https://manavagarwal.me,https://www.manavagarwal.me,http://localhost:8787,http://127.0.0.1:8787,http://localhost:3000,http://localhost:5173,http://localhost:8080

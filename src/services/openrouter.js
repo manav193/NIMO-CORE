@@ -32,7 +32,7 @@ function isRetryableStatus(status) {
 
 export class OpenRouterProvider {
   constructor({
-    apiKey = process.env.OPENROUTER_API_KEY || null,
+    apiKey = globalThis.process?.env?.OPENROUTER_API_KEY || null,
     models = null,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     fetchFn = globalThis.fetch
@@ -40,8 +40,8 @@ export class OpenRouterProvider {
     this.apiKey = apiKey;
     this.models = models && models.length
       ? models
-      : (process.env.OPENROUTER_MODELS
-          ? process.env.OPENROUTER_MODELS.split(',').map(m => m.trim()).filter(Boolean)
+      : (globalThis.process?.env?.OPENROUTER_MODELS
+          ? globalThis.process.env.OPENROUTER_MODELS.split(',').map(m => m.trim()).filter(Boolean)
           : DEFAULT_MODELS);
     this.timeoutMs = timeoutMs;
     this.fetch = fetchFn;

@@ -17,6 +17,7 @@
     "./adaptive/schema": "./src/adaptive/session-context.js",
     "./services/openrouter": "./src/services/openrouter.js",
     "./server": "./src/server/server.js",
+    "./worker": "./src/worker.js",
     "./project-manifest.schema.json": "./schemas/project-manifest.schema.json"
   },
   "scripts": {
