@@ -9,6 +9,7 @@ export { KnowledgeRegistry, createKnowledgeRegistry, registerProjectSource, getD
 export { normalizeProjectEntry, normalizeProjectSource } from './knowledge/schema.js';
 export { NIMO_GLOSSARY } from './knowledge/glossary.js';
 export { ARCADE_OS_PROJECTS_SOURCE } from './knowledge/sources/arcade-os-projects.js';
+export { PROMPT_AII_SOURCE } from './knowledge/sources/prompt-aii.js';
 export { createArcadeOsAdapter } from './adapters/arcade-os-adapter.js';
 export { createToolVerseAdapter } from './adapters/toolverse-adapter.js';
 export { createGenericProjectAdapter } from './adapters/generic-project-adapter.js';
@@ -26,9 +27,6 @@ export {
   getModules, findByCapability, findByKeyword, getDefaultModuleRegistry
 } from './federation/module-registry.js';
 export { ProjectFederation, createProjectFederation } from './federation/project-federation.js';
-export {
-  PROJECT_EVENT_TYPES, SYSTEM_STATUS_TYPES, createProjectEvent, isProjectEvent, createSystemStatus
-} from './federation/project-events.js';
 export { createModuleNavigationAction } from './federation/navigation-contract.js';
 export {
   normalizeAdaptiveSessionContext, ADAPTIVE_INTERACTION_MODES, ADAPTIVE_QUALITY_MODES
