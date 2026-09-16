@@ -394,20 +394,36 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
         const timeoutMs = env.PROVIDER_TIMEOUT_MS ? Number(env.PROVIDER_TIMEOUT_MS) : undefined;
         const appUrl = env.PUBLIC_APP_URL || 'https://manavagarwal.me';
 
-        const provider = options.aiProvider || createOpenRouterProvider({
-          apiKey,
-          models,
-          timeoutMs,
-          appUrl
-        });
+        let provider = null;
+        try {
+          provider = options.aiProvider || createOpenRouterProvider({
+            apiKey,
+            models,
+            timeoutMs,
+            appUrl
+          });
+        } catch (initErr) {
+          console.error(JSON.stringify({
+            level: 'error',
+            event: 'ai_fallback_exception',
+            errorType: 'PROVIDER_INIT_EXCEPTION',
+            errorMessage: initErr.message,
+            requestId,
+            fallbackToDeterministic: true
+          }));
+        }
 
         if (provider?.apiKey || options.aiProvider) {
+          const hasApiKey = Boolean(provider?.apiKey);
+          const sanitizedKeyLength = provider?.apiKey ? provider.apiKey.length : 0;
+
           console.log(JSON.stringify({
             level: 'info',
             event: 'ai_fallback_started',
             requestId,
             models: provider.models || models || 'default',
-            hasApiKey: Boolean(provider?.apiKey)
+            hasApiKey,
+            sanitizedKeyLength
           }));
 
           try {
@@ -452,6 +468,15 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
               fallbackToDeterministic: true
             }));
           }
+        } else if (provider) {
+          console.warn(JSON.stringify({
+            level: 'warn',
+            event: 'ai_fallback_skipped',
+            reason: 'OPENROUTER_API_KEY is empty or invalid after sanitization',
+            hasApiKey: false,
+            sanitizedKeyLength: 0,
+            requestId
+          }));
         }
       }
     }

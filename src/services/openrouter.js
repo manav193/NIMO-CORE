@@ -143,8 +143,8 @@ export class OpenRouterProvider {
           model,
           attempt: attempts + 1,
           maxRetries: MAX_RETRY_COUNT,
-          keyPrefix: this.apiKey ? `${this.apiKey.slice(0, 8)}...` : null,
-          keyLength: this.apiKey ? this.apiKey.length : 0,
+          hasApiKey: Boolean(this.apiKey),
+          sanitizedKeyLength: this.apiKey ? this.apiKey.length : 0,
           requestId
         }));
 
