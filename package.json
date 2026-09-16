@@ -16,13 +16,16 @@
     "./federation/events": "./src/federation/project-events.js",
     "./adaptive/schema": "./src/adaptive/session-context.js",
     "./services/openrouter": "./src/services/openrouter.js",
+    "./services/reverse-prompt": "./src/services/reverse-prompt.js",
     "./server": "./src/server/server.js",
+    "./server/gateway": "./src/server/gateway.js",
     "./worker": "./src/worker.js",
     "./learning": "./src/learning/index.js",
     "./project-manifest.schema.json": "./schemas/project-manifest.schema.json"
   },
   "scripts": {
-    "dev": "node src/server/server.js",
+    "start": "node src/server/gateway.js",
+    "dev": "node src/server/gateway.js",
     "test": "node --test tests/**/*.test.js tests/*.test.js",
     "lint": "node scripts/lint.mjs",
     "check": "node scripts/lint.mjs && node --test tests/**/*.test.js tests/*.test.js",
