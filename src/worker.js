@@ -1,5 +1,5 @@
 import { createNimoEngine } from './core/nimo-engine.js';
-import { createOpenRouterProvider } from './services/openrouter.js';
+import { createOpenRouterProvider, VERIFIED_FREE_CHAT_MODELS } from './services/openrouter.js';
 import { ARCADE_OS_PROJECTS_SOURCE } from './knowledge/sources/arcade-os-projects.js';
 import { createGenericProjectAdapter } from './adapters/generic-project-adapter.js';
 
@@ -399,6 +399,7 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
           provider = options.aiProvider || createOpenRouterProvider({
             apiKey,
             models,
+            allowedModels: VERIFIED_FREE_CHAT_MODELS,
             timeoutMs,
             appUrl
           });

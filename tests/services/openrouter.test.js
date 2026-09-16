@@ -5,7 +5,10 @@ import {
   createOpenRouterProvider,
   sanitizeModelOutput,
   resolveFetch,
-  DEFAULT_MODELS
+  DEFAULT_MODELS,
+  VERIFIED_FREE_CHAT_MODELS,
+  isModelEligible,
+  DISALLOWED_MODEL_PATTERNS
 } from '../../src/services/openrouter.js';
 
 test('sanitizeModelOutput strips reasoning and think blocks', () => {
@@ -275,10 +278,48 @@ test('OpenRouter default fetch preserves globalThis context and avoids illegal i
   }
 });
 
-test('DEFAULT_MODELS contains openrouter/free and zero paid models', () => {
-  assert.ok(DEFAULT_MODELS.includes('openrouter/free'));
-  assert.ok(DEFAULT_MODELS.every(m => !m.includes('gemini')));
-  assert.ok(DEFAULT_MODELS.every(m => m === 'openrouter/free' || m.endsWith(':free')));
+test('DEFAULT_MODELS contains verified free chat models and zero safety/moderation models', () => {
+  assert.ok(DEFAULT_MODELS.includes('nvidia/nemotron-3-super-120b-a12b:free'));
+  assert.ok(DEFAULT_MODELS.includes('nvidia/nemotron-3-ultra-550b-a55b:free'));
+  assert.ok(!DEFAULT_MODELS.includes('openrouter/free'));
+  assert.ok(DEFAULT_MODELS.every(m => m.endsWith(':free')));
+  assert.ok(DEFAULT_MODELS.every(m => !m.includes('safety') && !m.includes('moderation') && !m.includes('classifier')));
+});
+
+test('isModelEligible accepts verified models and rejects safety/moderation/classifier models', () => {
+  // Verified chat models
+  assert.equal(isModelEligible('nvidia/nemotron-3-super-120b-a12b:free'), true);
+  assert.equal(isModelEligible('nvidia/nemotron-3-ultra-550b-a55b:free'), true);
+  assert.equal(isModelEligible('inclusionai/ling-3.0-flash-vl:free'), true);
+  assert.equal(isModelEligible('google/gemma-4-26b-a4b-it:free'), true);
+
+  // Content safety / moderation / classifier models must be rejected
+  assert.equal(isModelEligible('nvidia/nemotron-3.5-content-safety:free'), false);
+  assert.equal(isModelEligible('meta-llama/llama-guard-3-8b:free'), false);
+  assert.equal(isModelEligible('openai/moderation'), false);
+  assert.equal(isModelEligible('test/safety-classifier:free'), false);
+  assert.equal(isModelEligible('openrouter/free'), false);
+
+  // Custom allowlist behavior
+  assert.equal(isModelEligible('custom/chat-model:free', { allowlist: ['custom/chat-model:free'] }), true);
+  assert.equal(isModelEligible('custom/chat-safety:free', { allowlist: ['custom/chat-safety:free'] }), false);
+  assert.equal(isModelEligible('unlisted/model:free', { allowlist: ['custom/chat-model:free'] }), false);
+});
+
+test('OpenRouterProvider filters out ineligible safety models and falls back to DEFAULT_MODELS if all are rejected', () => {
+  const providerWithSafety = new OpenRouterProvider({
+    apiKey: 'test-key',
+    models: ['nvidia/nemotron-3.5-content-safety:free', 'openrouter/free']
+  });
+  // Because all provided models were rejected as ineligible, it should safely fall back to DEFAULT_MODELS
+  assert.deepEqual(providerWithSafety.models, DEFAULT_MODELS);
+
+  const providerWithMixed = new OpenRouterProvider({
+    apiKey: 'test-key',
+    models: ['nvidia/nemotron-3.5-content-safety:free', 'valid/mock-model']
+  });
+  // The safety model is filtered out, leaving only valid/mock-model
+  assert.deepEqual(providerWithMixed.models, ['valid/mock-model']);
 });
 
 test('OpenRouter constructor strips quotes and whitespace from API key', () => {
@@ -338,44 +379,44 @@ test('OpenRouter captures error.code and error.message from HTTP 400 response bo
   }
 });
 
-test('OpenRouter completes successfully with openrouter/free router', async () => {
+test('OpenRouter completes successfully with verified free chat model', async () => {
   const mockFetch = async (url, opts) => {
     const body = JSON.parse(opts.body);
-    assert.equal(body.model, 'openrouter/free');
+    assert.equal(body.model, 'nvidia/nemotron-3-super-120b-a12b:free');
     return {
       ok: true,
       status: 200,
       json: async () => ({
-        model: 'openrouter/free',
-        choices: [{ message: { content: 'This is a free AI response from OpenRouter.' } }]
+        model: 'nvidia/nemotron-3-super-120b-a12b:free',
+        choices: [{ message: { content: '4' } }]
       })
     };
   };
 
   const provider = new OpenRouterProvider({
     apiKey: 'test-key',
-    models: ['openrouter/free'],
+    models: ['nvidia/nemotron-3-super-120b-a12b:free'],
     fetchFn: mockFetch
   });
 
-  const result = await provider.complete({ messages: [{ role: 'user', content: 'hello' }] });
+  const result = await provider.complete({ messages: [{ role: 'user', content: 'What is 2+2?' }] });
   assert.equal(result.success, true);
-  assert.equal(result.reply, 'This is a free AI response from OpenRouter.');
-  assert.equal(result.model, 'openrouter/free');
+  assert.equal(result.reply, '4');
+  assert.equal(result.model, 'nvidia/nemotron-3-super-120b-a12b:free');
   assert.equal(result.source, 'openrouter');
 });
 
-test('OpenRouter fails over from openrouter/free to explicit :free fallback model', async () => {
+test('OpenRouter fails over from primary verified model to secondary verified model', async () => {
   const attemptedModels = [];
   const mockFetch = async (url, opts) => {
     const body = JSON.parse(opts.body);
     attemptedModels.push(body.model);
 
-    if (body.model === 'openrouter/free') {
+    if (body.model === 'nvidia/nemotron-3-super-120b-a12b:free') {
       return {
         ok: false,
         status: 429,
-        text: async () => JSON.stringify({ error: { code: 429, message: 'Free router rate limited' } })
+        text: async () => JSON.stringify({ error: { code: 429, message: 'Primary rate limited' } })
       };
     }
 
@@ -383,21 +424,24 @@ test('OpenRouter fails over from openrouter/free to explicit :free fallback mode
       ok: true,
       status: 200,
       json: async () => ({
-        model: 'google/gemma-4-26b-a4b-it:free',
-        choices: [{ message: { content: 'Response from explicit free fallback' } }]
+        model: 'nvidia/nemotron-3-ultra-550b-a55b:free',
+        choices: [{ message: { content: 'Fallback answer from ultra' } }]
       })
     };
   };
 
   const provider = new OpenRouterProvider({
     apiKey: 'test-key',
-    models: ['openrouter/free', 'google/gemma-4-26b-a4b-it:free'],
+    models: ['nvidia/nemotron-3-super-120b-a12b:free', 'nvidia/nemotron-3-ultra-550b-a55b:free'],
     fetchFn: mockFetch
   });
 
   const result = await provider.complete({ messages: [{ role: 'user', content: 'test failover' }] });
   assert.equal(result.success, true);
-  assert.equal(result.reply, 'Response from explicit free fallback');
-  assert.equal(result.model, 'google/gemma-4-26b-a4b-it:free');
-  assert.deepEqual([...new Set(attemptedModels)], ['openrouter/free', 'google/gemma-4-26b-a4b-it:free']);
+  assert.equal(result.reply, 'Fallback answer from ultra');
+  assert.equal(result.model, 'nvidia/nemotron-3-ultra-550b-a55b:free');
+  assert.deepEqual([...new Set(attemptedModels)], [
+    'nvidia/nemotron-3-super-120b-a12b:free',
+    'nvidia/nemotron-3-ultra-550b-a55b:free'
+  ]);
 });

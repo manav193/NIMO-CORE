@@ -6,7 +6,7 @@
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
 # Comma-separated model list with automatic failover
-OPENROUTER_MODELS=openrouter/free
+OPENROUTER_MODELS=nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3-ultra-550b-a55b:free,inclusionai/ling-3.0-flash-vl:free
 
 # Provider timeout in milliseconds
 PROVIDER_TIMEOUT_MS=7500

@@ -4,10 +4,53 @@
  * and zero secret leakage.
  */
 
-export const DEFAULT_MODELS = [
-  'openrouter/free',
+export const VERIFIED_FREE_CHAT_MODELS = [
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'inclusionai/ling-3.0-flash-vl:free',
   'google/gemma-4-26b-a4b-it:free'
 ];
+
+export const DEFAULT_MODELS = [
+  'nvidia/nemotron-3-super-120b-a12b:free',
+  'nvidia/nemotron-3-ultra-550b-a55b:free',
+  'inclusionai/ling-3.0-flash-vl:free'
+];
+
+/**
+ * Patterns matching safety/moderation/classifier-only models or unrestricted random routers
+ * that must never be used for general chat.
+ */
+export const DISALLOWED_MODEL_PATTERNS = [
+  /content-safety/i,
+  /moderation/i,
+  /classifier/i,
+  /guardrail/i,
+  /guard/i,
+  /\bsafety\b/i,
+  /^openrouter\/free$/i
+];
+
+/**
+ * Guard function to determine whether a model ID is eligible for general chat completions.
+ * Enforces both an explicit configured allowlist and pattern-based rejection of safety/classifier models.
+ */
+export function isModelEligible(modelId, { allowlist = VERIFIED_FREE_CHAT_MODELS } = {}) {
+  if (typeof modelId !== 'string' || !modelId.trim()) return false;
+  const trimmed = modelId.trim();
+
+  // 1. Must be included in the configured allowlist (if allowlist provided)
+  if (Array.isArray(allowlist) && allowlist.length > 0) {
+    if (!allowlist.includes(trimmed)) return false;
+  }
+
+  // 2. Reject obvious safety/moderation/classifier-only model patterns
+  for (const pattern of DISALLOWED_MODEL_PATTERNS) {
+    if (pattern.test(trimmed)) return false;
+  }
+
+  return true;
+}
 
 const DEFAULT_TIMEOUT_MS = 10000;
 const MAX_RETRY_COUNT = 1;
@@ -65,6 +108,7 @@ export class OpenRouterProvider {
   constructor({
     apiKey = globalThis.process?.env?.OPENROUTER_API_KEY || null,
     models = null,
+    allowedModels = null,
     timeoutMs = DEFAULT_TIMEOUT_MS,
     fetchFn = null,
     appUrl = 'https://manavagarwal.me',
@@ -74,11 +118,32 @@ export class OpenRouterProvider {
       ? apiKey.trim().replace(/^["']|["']$/g, '').replace(/[\x00-\x1F\x7F]/g, '').trim()
       : null;
     this.apiKey = rawKey && rawKey.length > 0 ? rawKey : null;
-    this.models = models && models.length
+
+    const candidateModels = models && models.length
       ? models
       : (globalThis.process?.env?.OPENROUTER_MODELS
           ? globalThis.process.env.OPENROUTER_MODELS.split(',').map(m => m.trim()).filter(Boolean)
           : DEFAULT_MODELS);
+
+    const effectiveAllowlist = allowedModels != null
+      ? allowedModels
+      : (models ? null : VERIFIED_FREE_CHAT_MODELS);
+
+    const eligibleModels = candidateModels.filter(m => {
+      const eligible = isModelEligible(m, { allowlist: effectiveAllowlist });
+      if (!eligible) {
+        console.warn(JSON.stringify({
+          level: 'warn',
+          event: 'provider_ineligible_model_rejected',
+          provider: 'openrouter',
+          model: m,
+          reason: 'Model is not in allowed list or matches safety/classifier patterns'
+        }));
+      }
+      return eligible;
+    });
+
+    this.models = eligibleModels.length > 0 ? eligibleModels : [...DEFAULT_MODELS];
     this.timeoutMs = timeoutMs;
     this.fetch = resolveFetch(fetchFn);
     this.appUrl = appUrl;
