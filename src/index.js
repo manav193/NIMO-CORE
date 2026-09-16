@@ -13,6 +13,8 @@ export { createArcadeOsAdapter } from './adapters/arcade-os-adapter.js';
 export { createToolVerseAdapter } from './adapters/toolverse-adapter.js';
 export { createGenericProjectAdapter } from './adapters/generic-project-adapter.js';
 export { createBrowserClient } from './integrations/browser-client.js';
+export { createPromptAINimoBridge } from './integrations/prompt-ai-nimo.js';
+export { PromptAIClient, createPromptAIClient } from './services/prompt-ai.js';
 export { normalizeText, tokenize } from './utils/normalize-text.js';
 export { scoreAliases, tokenOverlapScore, clampScore } from './utils/scoring.js';
 export { KnowledgeValidationError, DuplicateKnowledgeError, assertPlainObject, sanitizeObject } from './utils/validation.js';
