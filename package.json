@@ -18,6 +18,7 @@
     "./services/openrouter": "./src/services/openrouter.js",
     "./server": "./src/server/server.js",
     "./worker": "./src/worker.js",
+    "./learning": "./src/learning/index.js",
     "./project-manifest.schema.json": "./schemas/project-manifest.schema.json"
   },
   "scripts": {

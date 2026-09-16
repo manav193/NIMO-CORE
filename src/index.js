@@ -31,6 +31,31 @@ export { createModuleNavigationAction } from './federation/navigation-contract.j
 export {
   normalizeAdaptiveSessionContext, ADAPTIVE_INTERACTION_MODES, ADAPTIVE_QUALITY_MODES
 } from './adaptive/session-context.js';
+export {
+  EVENT_TYPES,
+  LearningEvent,
+  createLearningEvent,
+  sanitizeMetadata,
+  extractSafeInputMetadata,
+  extractSafeResponseMetadata,
+  generateEventId,
+  OUTCOMES,
+  isOutcomeValid,
+  normalizeFeedback,
+  classifyOutcome,
+  LearningStore,
+  InMemoryLearningStore,
+  createInMemoryLearningStore,
+  PROPOSAL_CATEGORIES,
+  PROPOSAL_STATUSES,
+  ImprovementProposal,
+  EvaluationEngine,
+  createEvaluationEngine,
+  KNOWLEDGE_VERSION_STATUSES,
+  KnowledgeVersion,
+  KnowledgeVersionManager,
+  createKnowledgeVersionManager
+} from './learning/index.js';
 
 export { default as worker, handleWorkerRequest } from './worker.js';
 import worker from './worker.js';

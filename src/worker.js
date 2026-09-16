@@ -2,6 +2,8 @@ import { createNimoEngine } from './core/nimo-engine.js';
 import { createOpenRouterProvider, VERIFIED_FREE_CHAT_MODELS } from './services/openrouter.js';
 import { ARCADE_OS_PROJECTS_SOURCE } from './knowledge/sources/arcade-os-projects.js';
 import { createGenericProjectAdapter } from './adapters/generic-project-adapter.js';
+import { EVENT_TYPES, createLearningEvent, extractSafeInputMetadata } from './learning/events.js';
+import { OUTCOMES } from './learning/outcomes.js';
 
 const MAX_BODY_SIZE = 64 * 1024; // 64 KB limit
 const DEFAULT_RATE_LIMIT = 60; // requests per minute
@@ -367,11 +369,13 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
       ? parsed.context
       : {};
 
+    const learningStore = options.learningStore || env.learningStore || null;
     const nimoEngine = options.engine || createNimoEngine({
-      adapters: [createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE })]
+      adapters: [createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE })],
+      learningStore
     });
 
-    const response = nimoEngine.respond(message, context);
+    const response = nimoEngine.respond(message, { ...context, requestId });
 
     // If deterministic response was fallback and AI is configured, attempt remote fallback
     const apiKey = (typeof env.OPENROUTER_API_KEY === 'string' && env.OPENROUTER_API_KEY.trim()) ||
@@ -442,6 +446,20 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
                 requestId
               }));
 
+              if (learningStore && typeof learningStore.record === 'function') {
+                Promise.resolve(learningStore.record(createLearningEvent({
+                  requestId,
+                  eventType: EVENT_TYPES.AI_SUCCESS,
+                  source: 'openrouter',
+                  intent: 'ai_fallback',
+                  inputMetadata: extractSafeInputMetadata(message),
+                  responseMetadata: { length: aiResult.reply?.length || 0, model: aiResult.model },
+                  modelMetadata: { model: aiResult.model, provider: 'openrouter', latencyMs: aiResult.latencyMs },
+                  outcome: OUTCOMES.UNKNOWN,
+                  latency: aiResult.latencyMs
+                }))).catch(() => {});
+              }
+
               return jsonResponse({
                 success: true,
                 reply: aiResult.reply,
@@ -458,6 +476,18 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
                 requestId,
                 fallbackToDeterministic: true
               }));
+
+              if (learningStore && typeof learningStore.record === 'function') {
+                Promise.resolve(learningStore.record(createLearningEvent({
+                  requestId,
+                  eventType: EVENT_TYPES.AI_FAILURE,
+                  source: 'openrouter',
+                  intent: 'ai_fallback',
+                  inputMetadata: extractSafeInputMetadata(message),
+                  outcome: OUTCOMES.FAILURE,
+                  errorCode: aiResult?.error || 'UNKNOWN_PROVIDER_ERROR'
+                }))).catch(() => {});
+              }
             }
           } catch (providerErr) {
             console.error(JSON.stringify({
@@ -468,6 +498,18 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
               requestId,
               fallbackToDeterministic: true
             }));
+
+            if (learningStore && typeof learningStore.record === 'function') {
+              Promise.resolve(learningStore.record(createLearningEvent({
+                requestId,
+                eventType: EVENT_TYPES.AI_FAILURE,
+                source: 'openrouter',
+                intent: 'ai_fallback',
+                inputMetadata: extractSafeInputMetadata(message),
+                outcome: OUTCOMES.FAILURE,
+                errorCode: 'UNCAUGHT_PROVIDER_EXCEPTION'
+              }))).catch(() => {});
+            }
           }
         } else if (provider) {
           console.warn(JSON.stringify({
