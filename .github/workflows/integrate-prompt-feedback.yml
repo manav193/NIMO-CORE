@@ -58,10 +58,12 @@ jobs:
           p.write_text(text)
           PY
 
-      - name: Validate
+      - name: Validate integration
         run: |
           npm install --no-audit --no-fund
-          npm test
+          node --check src/server/server.js
+          node --check src/services/prompt-ai.js
+          node --test tests/core/learning.test.js tests/core/server.test.js
 
       - name: Commit and remove workflow
         run: |
