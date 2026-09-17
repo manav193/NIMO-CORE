@@ -48,7 +48,6 @@ export const PROMPT_AII_SOURCE = Object.freeze({
         'adapt_promplet'
       ],
       keywords: [
-        'prompt',
         'prompt engineering',
         'deep prompt',
         'reverse prompt',
