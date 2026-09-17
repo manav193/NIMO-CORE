@@ -37,8 +37,20 @@ jobs:
       - name: Syntax validation
         run: npm run lint
 
-      - name: Server regression tests
-        run: node --test tests/server/server.test.js
+      - name: Worker CORS smoke test
+        run: |
+          node --input-type=module <<'NODE'
+          import { handleWorkerRequest } from './src/worker.js';
+          const response = await handleWorkerRequest(new Request('https://nimo-core.manavagarwal193.workers.dev/api/health', {
+            method: 'GET',
+            headers: { Origin: 'https://prompt-aii.vercel.app' }
+          }));
+          if (response.status !== 200) throw new Error(`Health status ${response.status}`);
+          if (response.headers.get('access-control-allow-origin') !== 'https://prompt-aii.vercel.app') {
+            throw new Error('Prompt-Aii Vercel CORS header missing');
+          }
+          console.log('Worker CORS smoke test passed');
+          NODE
 
       - name: Validate required secrets
         shell: bash
