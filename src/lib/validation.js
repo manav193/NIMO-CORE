@@ -2,11 +2,18 @@ import { PROJECT_IDS } from '../knowledge/projects.js';
 
 const ALLOWED_LANGUAGES = new Set(['en', 'hi', 'hinglish']);
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{0,63}$/;
+const KNOWLEDGE_ID_PATTERN = /^kno-[a-z0-9-]{1,120}$/;
 
 function cleanId(value, fallback = null) {
   if (typeof value !== 'string') return fallback;
   const normalized = value.trim().toLowerCase();
   return ID_PATTERN.test(normalized) ? normalized : fallback;
+}
+
+function cleanKnowledgeId(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().toLowerCase();
+  return KNOWLEDGE_ID_PATTERN.test(normalized) ? normalized : null;
 }
 
 export function validateChatPayload(input) {
@@ -22,6 +29,7 @@ export function validateChatPayload(input) {
   const projectId = cleanId(rawContext.projectId || rawContext.project);
   const context = {
     projectId: projectId && PROJECT_IDS.has(projectId) ? projectId : null,
+    governedKnowledge: cleanKnowledgeId(rawContext.governedKnowledge),
     pageId: cleanId(rawContext.pageId || rawContext.page, 'home'),
     sectionId: cleanId(rawContext.sectionId || rawContext.section, 'home'),
     language: ALLOWED_LANGUAGES.has(rawContext.language) ? rawContext.language : 'en'
