@@ -4,6 +4,8 @@
  * It never approves, mutates, or publishes knowledge.
  */
 
+import { loadApprovedKnowledge } from './approved-loader.js';
+
 const PATH_PATTERN = /^knowledge\/projects\/prompt-aii-[a-z0-9-]+\.json$/;
 const ID_PATTERN = /^kno-[a-z0-9-]+$/;
 
@@ -36,4 +38,25 @@ export function canActivatePromptAiiKnowledge(manifest) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Resolve an approved Prompt-Aii knowledge entry for runtime consumption.
+ * The manifest is validated first, then the normal approved/sanitized loader
+ * is used. A manifest never bypasses catalog approval or sanitization checks.
+ */
+export function resolveActivatedPromptAiiKnowledge({ manifest, catalog, entries = [] } = {}) {
+  const activation = validatePromptAiiActivationManifest(manifest);
+  const result = loadApprovedKnowledge({ catalog, entries });
+  const entry = result.loaded.find(item =>
+    item.id === activation.knowledgeEntryId &&
+    item.version === activation.version &&
+    item.path === activation.knowledgePath
+  );
+
+  if (!entry) {
+    throw new Error(`Approved Prompt-Aii knowledge entry not available: ${activation.knowledgeEntryId}`);
+  }
+
+  return Object.freeze({ activation, entry });
 }
