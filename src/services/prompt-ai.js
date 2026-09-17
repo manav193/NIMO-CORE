@@ -5,6 +5,8 @@
  * orchestration, context, action state, and execution boundaries.
  */
 
+import { createPromptAiiLearningEvent } from '../learning/prompt-aii-events.js';
+
 const DEFAULT_TIMEOUT_MS = 12000;
 
 function cleanBaseUrl(value) {
@@ -34,7 +36,9 @@ export class PromptAIClient {
     baseUrl = globalThis.process?.env?.PROMPT_AI_URL || 'http://localhost:3001',
     integrationKey = globalThis.process?.env?.NIMO_INTEGRATION_KEY || null,
     timeoutMs = DEFAULT_TIMEOUT_MS,
-    fetchFn = null
+    fetchFn = null,
+    learningStore = null,
+    onLearningEvent = null
   } = {}) {
     this.baseUrl = cleanBaseUrl(baseUrl);
     this.integrationKey = typeof integrationKey === 'string' && integrationKey.trim()
@@ -42,19 +46,53 @@ export class PromptAIClient {
       : null;
     this.timeoutMs = Math.max(1000, Number(timeoutMs) || DEFAULT_TIMEOUT_MS);
     this.fetch = resolveFetch(fetchFn);
+    this.learningStore = learningStore || null;
+    this.onLearningEvent = typeof onLearningEvent === 'function' ? onLearningEvent : null;
   }
 
   isConfigured() {
     return Boolean(this.integrationKey && this.baseUrl);
   }
 
+  async #recordLearningEvent({ requestId, input, context, executionTarget, model, result, latency }) {
+    if (!this.learningStore && !this.onLearningEvent) return;
+    try {
+      const event = createPromptAiiLearningEvent({
+        requestId,
+        input,
+        intent: context?.intent || null,
+        language: context?.language || null,
+        target: executionTarget,
+        model: typeof model === 'object' ? model : { model },
+        strategy: context?.strategy || null,
+        outcome: result?.success ? 'success' : 'failure',
+        errorCode: result?.success ? null : result?.error || 'PROMPT_AI_FAILURE',
+        latency
+      });
+
+      if (this.learningStore && typeof this.learningStore.record === 'function') {
+        await this.learningStore.record(event);
+      }
+      if (this.onLearningEvent) {
+        try { this.onLearningEvent(event); } catch {}
+      }
+    } catch {
+      // Learning telemetry is fault-isolated from the Prompt-Aii request path.
+    }
+  }
+
   async compile({ message, context = {}, executionTarget = 'browser', model = 'NIMO', requestId = null } = {}) {
+    const startedAt = Date.now();
     const input = typeof message === 'string' ? message.trim() : '';
     if (!input) {
-      return { success: false, error: 'INVALID_MESSAGE', source: 'prompt-ai' };
+      const result = { success: false, error: 'INVALID_MESSAGE', source: 'prompt-ai' };
+      await this.#recordLearningEvent({ requestId, input, context, executionTarget, model, result, latency: Date.now() - startedAt });
+      return result;
     }
     if (!this.isConfigured()) {
-      return { success: false, error: 'PROMPT_AI_NOT_CONFIGURED', source: 'prompt-ai' };
+      const result = { success: false, error: 'PROMPT_AI_NOT_CONFIGURED', source: 'prompt-ai' };
+      await this.#recordLearningEvent({ requestId, input, context, executionTarget, model, result, latency: Date.now() - startedAt });
+      return result;
     }
 
     const controller = new AbortController();
@@ -81,20 +119,24 @@ export class PromptAIClient {
       try { data = await response.json(); } catch {}
 
       if (!response.ok) {
-        return {
+        const result = {
           success: false,
           error: data?.detail || `HTTP_${response.status}`,
           status: response.status,
           source: 'prompt-ai'
         };
+        await this.#recordLearningEvent({ requestId, input, context, executionTarget, model, result, latency: Date.now() - startedAt });
+        return result;
       }
 
       const validation = validatePlan(data);
       if (!validation.ok) {
-        return { success: false, error: validation.error, source: 'prompt-ai' };
+        const result = { success: false, error: validation.error, source: 'prompt-ai' };
+        await this.#recordLearningEvent({ requestId, input, context, executionTarget, model, result, latency: Date.now() - startedAt });
+        return result;
       }
 
-      return {
+      const result = {
         success: true,
         source: 'prompt-ai',
         bridgeVersion: data.bridge_version || 'unknown',
@@ -110,12 +152,16 @@ export class PromptAIClient {
         request: input,
         context: data.context && typeof data.context === 'object' ? data.context : context
       };
+      await this.#recordLearningEvent({ requestId, input, context, executionTarget, model, result, latency: Date.now() - startedAt });
+      return result;
     } catch (error) {
-      return {
+      const result = {
         success: false,
         error: error?.name === 'AbortError' ? 'PROMPT_AI_TIMEOUT' : 'PROMPT_AI_NETWORK_FAILURE',
         source: 'prompt-ai'
       };
+      await this.#recordLearningEvent({ requestId, input, context, executionTarget, model, result, latency: Date.now() - startedAt });
+      return result;
     } finally {
       clearTimeout(timer);
     }
