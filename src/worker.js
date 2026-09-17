@@ -1,6 +1,7 @@
 import { createNimoEngine } from './core/nimo-engine.js';
 import { createOpenRouterProvider, VERIFIED_FREE_CHAT_MODELS } from './services/openrouter.js';
 import { ARCADE_OS_PROJECTS_SOURCE } from './knowledge/sources/arcade-os-projects.js';
+import { PROMPT_AII_SOURCE } from './knowledge/sources/prompt-aii.js';
 import { createGenericProjectAdapter } from './adapters/generic-project-adapter.js';
 import { EVENT_TYPES, createLearningEvent, extractSafeInputMetadata } from './learning/events.js';
 import { OUTCOMES } from './learning/outcomes.js';
@@ -371,7 +372,10 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
 
     const learningStore = options.learningStore || env.learningStore || null;
     const nimoEngine = options.engine || createNimoEngine({
-      adapters: [createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE })],
+      adapters: [
+      createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE }),
+      createGenericProjectAdapter({ source: PROMPT_AII_SOURCE })
+    ],
       learningStore
     });
 

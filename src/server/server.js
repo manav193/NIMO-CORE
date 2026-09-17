@@ -2,6 +2,7 @@ import http from 'node:http';
 import { createNimoEngine } from '../core/nimo-engine.js';
 import { createOpenRouterProvider } from '../services/openrouter.js';
 import { ARCADE_OS_PROJECTS_SOURCE } from '../knowledge/sources/arcade-os-projects.js';
+import { PROMPT_AII_SOURCE } from '../knowledge/sources/prompt-aii.js';
 import { createGenericProjectAdapter } from '../adapters/generic-project-adapter.js';
 
 const DEFAULT_PORT = 8787;
@@ -202,7 +203,10 @@ export function createServer({
   rateLimiter = null
 } = {}) {
   const nimoEngine = engine || createNimoEngine({
-    adapters: [createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE })]
+    adapters: [
+      createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE }),
+      createGenericProjectAdapter({ source: PROMPT_AII_SOURCE })
+    ]
   });
 
   const provider = aiProvider || createOpenRouterProvider();
