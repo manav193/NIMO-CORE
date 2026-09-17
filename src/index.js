@@ -7,6 +7,7 @@ export { buildResponse } from './response-builder.js';
 export { NIMO_PERSONA } from './persona/nimo-persona.js';
 export { KnowledgeRegistry, createKnowledgeRegistry, registerProjectSource, getDefaultRegistry } from './knowledge/registry.js';
 export { normalizeProjectEntry, normalizeProjectSource } from './knowledge/schema.js';
+export { loadApprovedKnowledge, createApprovedKnowledgeLoader } from './knowledge/approved-loader.js';
 export { NIMO_GLOSSARY } from './knowledge/glossary.js';
 export { ARCADE_OS_PROJECTS_SOURCE } from './knowledge/sources/arcade-os-projects.js';
 export { PROMPT_AII_SOURCE } from './knowledge/sources/prompt-aii.js';
