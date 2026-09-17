@@ -48,6 +48,43 @@ export function evaluatePromptAiiEvents(events = [], { minEvidenceCount = 3 } = 
   return proposals;
 }
 
+/**
+ * Convert a proposal into the NIMO-KNOWLEDGE review-artifact contract.
+ * This is serialization only: it does not approve, publish, or activate knowledge.
+ */
+export function serializePromptAiiProposal(proposal) {
+  if (!proposal || typeof proposal.toJSON !== 'function') {
+    throw new TypeError('serializePromptAiiProposal requires an ImprovementProposal');
+  }
+
+  const value = proposal.toJSON();
+  if (!String(value.proposalId).startsWith('prop-prompt-aii-')) {
+    throw new TypeError('Prompt-Aii proposalId must use the governed prefix');
+  }
+
+  return Object.freeze({
+    proposalId: value.proposalId,
+    sourceProject: 'prompt-aii',
+    category: value.category,
+    target: value.target,
+    evidence: value.evidence,
+    confidence: value.confidence,
+    expectedImprovement: value.expectedImprovement,
+    risk: value.risk,
+    status: value.status,
+    createdAt: value.createdAt,
+    metadata: Object.freeze({
+      sanitized: true,
+      requiresHumanReview: true,
+      knowledgeEntryPath: null
+    })
+  });
+}
+
+export function serializePromptAiiProposals(proposals = []) {
+  return proposals.map(serializePromptAiiProposal);
+}
+
 export async function evaluatePromptAiiLearningStore(store, options = {}) {
   if (!store || typeof store.getByProject !== 'function') return [];
   const events = await store.getByProject('prompt-aii', options.maxEvents || 500);
