@@ -23,7 +23,11 @@ function parseMultipartImage(contentType, bodyBuffer) {
   const imagePart = parts.find(p => /name="image"/i.test(p.headers));
   if (!imagePart) throw new Error('Image field is required');
   const type = /Content-Type:\s*([^\r\n]+)/i.exec(imagePart.headers)?.[1]?.trim().toLowerCase();
-  return { mimeType: type, base64: imagePart.content.toString('base64') };
+  const targetPart = parts.find(p => /name="target_model"/i.test(p.headers));
+  const targetModel = targetPart ? targetPart.content.toString('utf8').trim() : null;
+  const detailPart = parts.find(p => /name="detail"/i.test(p.headers));
+  const detail = detailPart ? detailPart.content.toString('utf8').trim() : 'high';
+  return { image: { mimeType: type, base64: imagePart.content.toString('base64') }, targetModel, detail };
 }
 
 export async function handleReversePrompt(req, res, { service = null, requestId = null } = {}) {
@@ -48,8 +52,13 @@ export async function handleReversePrompt(req, res, { service = null, requestId 
       if (total > MAX_BODY_SIZE) throw new Error('Request too large');
       chunks.push(chunk);
     }
-    const image = parseMultipartImage(contentType, Buffer.concat(chunks));
-    const result = await (service || createReversePromptService()).analyze({ image, requestId });
+    const parsed = parseMultipartImage(contentType, Buffer.concat(chunks));
+    const result = await (service || createReversePromptService()).analyze({
+      image: parsed.image,
+      detail: parsed.detail,
+      targetModel: parsed.targetModel,
+      requestId
+    });
     const status = result.success ? 200 : (result.error === 'MISSING_API_KEY' ? 503 : 502);
     res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(result));
