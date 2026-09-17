@@ -49,12 +49,7 @@ jobs:
                   p.write_text(text)
           PY
 
-      - name: Validate
-        run: |
-          npm install
-          npm test
-
-      - name: Commit integration if needed
+      - name: Commit integration before validation
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
@@ -62,9 +57,12 @@ jobs:
           git add src/server/server.js src/worker.js
           if git diff --cached --quiet; then
             echo "PromptAI source already registered in runtime entrypoints."
-            exit 0
+          else
+            git commit -m "feat: register PromptAI knowledge in runtime"
+            git push
           fi
-          git commit -m "feat: register PromptAI knowledge in runtime"
-          git push
 
-# Triggered by this workflow update so the runtime registration is executed on main.
+      - name: Validate
+        run: |
+          npm install
+          npm test
