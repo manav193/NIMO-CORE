@@ -70,6 +70,7 @@ export {
 } from './learning/index.js';
 export { validatePromptAiiActivationManifest, canActivatePromptAiiKnowledge, resolveActivatedPromptAiiKnowledge } from './knowledge/prompt-aii-activation.js';
 export { buildPromptAiiStrategy } from './knowledge/prompt-aii-strategy.js';
+export { resolvePromptAiiRuntimeStrategy, isPromptAiiKnowledgeContext, clearPromptAiiRuntimeCache } from './knowledge/prompt-aii-runtime.js';
 
 export { default as worker, handleWorkerRequest } from './worker.js';
 import worker from './worker.js';
