@@ -1,0 +1,47 @@
+name: Repair Worker CORS v2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-worker-cors-v2.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore known-good worker and add Vercel origin
+        run: |
+          git checkout 96dbb02b782df2f00b832bd5594ef61e3f16ca61 -- src/worker.js
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/worker.js')
+          text = p.read_text()
+          marker = "    'https://www.manavagarwal.me',\n"
+          if "'https://prompt-aii.vercel.app'" not in text:
+              if marker not in text:
+                  raise SystemExit('CORS origin marker not found')
+              text = text.replace(marker, marker + "    'https://prompt-aii.vercel.app',\n", 1)
+          p.write_text(text)
+          PY
+
+      - name: Validate worker tests
+        run: |
+          npm install --no-audit --no-fund
+          node --test tests/server/worker.test.js
+
+      - name: Commit and remove temporary workflows
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/worker.js
+          git rm .github/workflows/fix-worker-cors.yml .github/workflows/repair-worker-cors-v2.yml
+          git commit -m 'fix(cors): restore worker and allow Prompt-Aii Vercel'
+          git push
