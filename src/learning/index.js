@@ -46,3 +46,8 @@ export {
   createPromptAiiLearningEvent,
   isPromptAiiLearningEvent
 } from './prompt-aii-events.js';
+
+export {
+  evaluatePromptAiiEvents,
+  evaluatePromptAiiLearningStore
+} from './prompt-aii-evaluation.js';
