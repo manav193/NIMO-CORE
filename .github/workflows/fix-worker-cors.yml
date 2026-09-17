@@ -1,0 +1,48 @@
+name: Fix Prompt-Aii Worker CORS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/fix-worker-cors.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Restore worker and apply surgical CORS fix
+        run: |
+          git checkout HEAD^ -- src/worker.js
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/worker.js')
+          text = p.read_text()
+          marker = "    'https://www.manavagarwal.me',\n"
+          addition = marker + "    'https://prompt-aii.vercel.app',\n"
+          if "'https://prompt-aii.vercel.app'" not in text:
+              if marker not in text:
+                  raise SystemExit('CORS origin marker not found')
+              text = text.replace(marker, addition, 1)
+          p.write_text(text)
+          PY
+
+      - name: Validate worker integration
+        run: |
+          npm install --no-audit --no-fund
+          node --test tests/server/worker.test.js
+
+      - name: Commit and remove workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/worker.js
+          git rm .github/workflows/fix-worker-cors.yml
+          git commit -m 'fix(cors): allow Prompt-Aii Vercel NIMO console'
+          git push
