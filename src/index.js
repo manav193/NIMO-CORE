@@ -29,6 +29,11 @@ export {
 export { ProjectFederation, createProjectFederation } from './federation/project-federation.js';
 export { createModuleNavigationAction } from './federation/navigation-contract.js';
 export {
+  createProjectEvent,
+  isProjectEvent,
+  PROJECT_EVENT_TYPES
+} from './federation/project-events.js';
+export {
   normalizeAdaptiveSessionContext, ADAPTIVE_INTERACTION_MODES, ADAPTIVE_QUALITY_MODES
 } from './adaptive/session-context.js';
 export {
