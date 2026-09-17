@@ -41,3 +41,8 @@ export {
   KnowledgeVersionManager,
   createKnowledgeVersionManager
 } from './knowledge-version.js';
+
+export {
+  createPromptAiiLearningEvent,
+  isPromptAiiLearningEvent
+} from './prompt-aii-events.js';
