@@ -6,7 +6,7 @@
  * or mutates knowledge.
  */
 
-import { resolveActivatedPromptAiiKnowledge } from './prompt-aii-activation.js';
+import { validatePromptAiiActivationManifest, resolveActivatedPromptAiiKnowledge } from './prompt-aii-activation.js';
 import { buildPromptAiiStrategy } from './prompt-aii-strategy.js';
 
 const DEFAULT_RAW_BASE = 'https://raw.githubusercontent.com/manav193/NIMO-KNOWLEDGE/main/';
@@ -30,13 +30,13 @@ export async function resolvePromptAiiRuntimeStrategy({ env = {}, fetchImpl, for
 
   const base = String(env.NIMO_KNOWLEDGE_RAW_BASE || DEFAULT_RAW_BASE).replace(/\/+$/, '') + '/';
   const manifest = await fetchJson(`${base}${MANIFEST_PATH}`, fetchImpl);
-  const catalog = await fetchJson(`${base}${CATALOG_PATH}`, fetchImpl);
-  const activation = resolveActivatedPromptAiiKnowledge({ manifest, catalog, entries: [] });
+  const activation = validatePromptAiiActivationManifest(manifest);
+  if (activation.knowledgeEntryId !== DEFAULT_KNOWLEDGE_ID) {
+    throw new Error('Unexpected Prompt-Aii knowledge entry');
+  }
 
-  // The approved-loader accepts supplied entries. Fetch only the exact path
-  // named by the already-validated activation manifest.
-  const path = activation.activation.knowledgePath;
-  const entry = await fetchJson(`${base}${path}`, fetchImpl);
+  const catalog = await fetchJson(`${base}${CATALOG_PATH}`, fetchImpl);
+  const entry = await fetchJson(`${base}${activation.knowledgePath}`, fetchImpl);
   const resolved = resolveActivatedPromptAiiKnowledge({ manifest, catalog, entries: [entry] });
   const strategy = buildPromptAiiStrategy(resolved);
 
