@@ -49,5 +49,7 @@ export {
 
 export {
   evaluatePromptAiiEvents,
-  evaluatePromptAiiLearningStore
+  evaluatePromptAiiLearningStore,
+  serializePromptAiiProposal,
+  serializePromptAiiProposals
 } from './prompt-aii-evaluation.js';
