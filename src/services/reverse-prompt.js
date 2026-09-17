@@ -3,6 +3,21 @@ import { resolveFetch, sanitizeModelOutput, VERIFIED_FREE_CHAT_MODELS } from './
 const DEFAULT_VISION_MODEL = 'inclusionai/ling-3.0-flash-vl:free';
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const DEFAULT_TIMEOUT_MS = 20000;
+const DEFAULT_TARGET_MODEL = 'Midjourney';
+
+const TARGET_MODELS = new Set([
+  'Midjourney',
+  'Stable Diffusion',
+  'Flux',
+  'Adobe Firefly'
+]);
+
+const TARGET_GUIDANCE = {
+  Midjourney: 'Reconstruct for Midjourney-style prompting: prioritize subject, composition, visual style, lighting, camera cues when inferable, color palette, environment, and concise parameter-ready phrasing. Do not invent unavailable parameters.',
+  'Stable Diffusion': 'Reconstruct for Stable Diffusion-style prompting: prioritize explicit subject attributes, composition, lighting, materials, style, camera cues when inferable, and a separate negative prompt with concrete visual exclusions.',
+  Flux: 'Reconstruct for Flux-style prompting: prioritize natural-language scene description, subject relationships, composition, lighting, materials, environment, typography/text only when visible, and precise visual constraints.',
+  'Adobe Firefly': 'Reconstruct for Adobe Firefly-style prompting: prioritize clear subject, scene, composition, lighting, color, materials, photographic/art direction, and practical visual constraints without inventing hidden metadata.'
+};
 
 const SYSTEM_PROMPT = `You are NIMO-Core's reverse prompt engineering vision specialist. Analyze the supplied image and reconstruct a high-quality image-generation prompt that could plausibly reproduce it. Do not claim to know hidden source prompts or metadata. Infer only visible characteristics. Return ONLY valid JSON with this shape: {"prompt":"...","negative_prompt":"...","analysis":{"subject":"...","composition":"...","lighting":"...","style":"...","colors":"...","environment":"...","camera":"..."}}. Make the prompt detailed and production-ready. Mention camera/lens only when visually inferable; otherwise say unknown/inferred.`;
 
@@ -17,6 +32,10 @@ function imageDataUrl(image) {
   return `data:${mime};base64,${base64}`;
 }
 
+function resolveTargetModel(value) {
+  return typeof value === 'string' && TARGET_MODELS.has(value) ? value : DEFAULT_TARGET_MODEL;
+}
+
 export class ReversePromptService {
   constructor({ apiKey = globalThis.process?.env?.OPENROUTER_API_KEY || null, model = null, timeoutMs = DEFAULT_TIMEOUT_MS, fetchFn = null } = {}) {
     this.apiKey = typeof apiKey === 'string' ? apiKey.trim() : null;
@@ -25,13 +44,15 @@ export class ReversePromptService {
     this.fetch = resolveFetch(fetchFn);
   }
 
-  async analyze({ image, detail = 'high', requestId = null } = {}) {
+  async analyze({ image, detail = 'high', targetModel = DEFAULT_TARGET_MODEL, requestId = null } = {}) {
     const dataUrl = imageDataUrl(image);
     if (!this.apiKey) return { success: false, error: 'MISSING_API_KEY', message: 'Vision AI provider is not configured.' };
     if (!VERIFIED_FREE_CHAT_MODELS.includes(this.model) && !this.model.includes(':')) {
       return { success: false, error: 'MODEL_NOT_ALLOWED', message: 'Configured vision model is not allowed.' };
     }
 
+    const selectedTarget = resolveTargetModel(targetModel);
+    const targetGuidance = TARGET_GUIDANCE[selectedTarget];
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), this.timeoutMs);
     try {
@@ -49,7 +70,7 @@ export class ReversePromptService {
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: [
-              { type: 'text', text: `Reverse engineer this image. Detail level: ${detail}.` },
+              { type: 'text', text: `Reverse engineer this image for target model: ${selectedTarget}. Detail level: ${detail}. ${targetGuidance} First decompose the visible image, then reconstruct the target-model prompt from that decomposition.` },
               { type: 'image_url', image_url: { url: dataUrl } }
             ] }
           ],
@@ -78,6 +99,7 @@ export class ReversePromptService {
         negative_prompt: typeof parsed.negative_prompt === 'string' ? parsed.negative_prompt.trim() : '',
         analysis: parsed.analysis && typeof parsed.analysis === 'object' ? parsed.analysis : {},
         model: data?.model || this.model,
+        target_model: selectedTarget,
         source: 'openrouter'
       };
     } catch (error) {
