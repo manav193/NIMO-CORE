@@ -66,3 +66,5 @@ jobs:
           fi
           git commit -m "feat: register PromptAI knowledge in runtime"
           git push
+
+# Triggered by this workflow update so the runtime registration is executed on main.
