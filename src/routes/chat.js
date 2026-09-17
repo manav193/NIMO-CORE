@@ -1,6 +1,7 @@
 import { validateChatPayload } from '../lib/validation.js';
 import { queryOpenRouter } from '../services/openrouter.js';
 import { resolveDeterministicReply } from '../services/deterministic.js';
+import { isPromptAiiKnowledgeContext, resolvePromptAiiRuntimeStrategy } from '../knowledge/prompt-aii-runtime.js';
 
 const fallbackRateMap = new Map();
 const CACHE_TTL_SECONDS = 300;
@@ -131,7 +132,29 @@ export async function handleChat(request, env, corsHeaders, requestId) {
     }
   }
 
-  const result = await queryOpenRouter({ ...validation.value, env, requestId });
+  let runtimeStrategy = null;
+  if (isPromptAiiKnowledgeContext(context)) {
+    try {
+      runtimeStrategy = await resolvePromptAiiRuntimeStrategy({ env });
+    } catch (error) {
+      // Governance failure must never cause unapproved knowledge to be used.
+      // Fall back to the normal NIMO route rather than inventing strategy data.
+      logEvent('prompt_aii_strategy_unavailable', {
+        requestId,
+        reason: error?.message || 'unknown'
+      });
+    }
+  }
+
+  const routedMessage = runtimeStrategy
+    ? `GOVERNED PROMPT-AII STRATEGY (APPROVED KNOWLEDGE):\n${runtimeStrategy.summary}\n\nGUIDELINES:\n${runtimeStrategy.guidelines.map(item => `- ${item}`).join('\n')}\n\nUSER REQUEST:\n${message}`
+    : message;
+
+  const result = await queryOpenRouter({
+    ...validation.value,
+    message: routedMessage,
+    requestId
+  });
   if (!result.ok) {
     console.error(JSON.stringify({ event: 'chat_failure', requestId, details: result.internalErrors || [], latencyMs: Date.now() - startedAt }));
     return json({ success: false, reply: null, error: result.publicError }, 503, corsHeaders, requestId);
