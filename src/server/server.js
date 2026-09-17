@@ -1,6 +1,8 @@
 import http from 'node:http';
 import { createNimoEngine } from '../core/nimo-engine.js';
 import { createOpenRouterProvider } from '../services/openrouter.js';
+import { createInMemoryLearningStore } from '../learning/store.js';
+import { createPromptAiiLearningEvent } from '../learning/prompt-aii-events.js';
 import { ARCADE_OS_PROJECTS_SOURCE } from '../knowledge/sources/arcade-os-projects.js';
 import { PROMPT_AII_SOURCE } from '../knowledge/sources/prompt-aii.js';
 import { createGenericProjectAdapter } from '../adapters/generic-project-adapter.js';
@@ -200,13 +202,16 @@ function getAllowedOrigins() {
 export function createServer({
   engine = null,
   aiProvider = null,
-  rateLimiter = null
+  rateLimiter = null,
+  learningStore = null
 } = {}) {
+  const feedbackLearningStore = learningStore || createInMemoryLearningStore();
   const nimoEngine = engine || createNimoEngine({
     adapters: [
       createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE }),
       createGenericProjectAdapter({ source: PROMPT_AII_SOURCE })
-    ]
+    ],
+    learningStore: feedbackLearningStore
   });
 
   const provider = aiProvider || createOpenRouterProvider();
@@ -305,6 +310,69 @@ export function createServer({
         uptime: Math.round(process.uptime()),
         timestamp: new Date().toISOString()
       }));
+      return;
+    }
+
+    // POST /api/nimo/feedback — sanitized Prompt-Aii feedback observation
+    if (pathname === '/api/nimo/feedback') {
+      if (req.method !== 'POST') {
+        res.writeHead(405, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Method Not Allowed' }));
+        return;
+      }
+      const configuredKey = process.env.NIMO_INTEGRATION_KEY;
+      const suppliedKey = req.headers['x-nimo-integration-key'];
+      if (configuredKey && suppliedKey !== configuredKey) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, error: 'Unauthorized' }));
+        return;
+      }
+      let body = '';
+      let bytesRead = 0;
+      let bodyTooLarge = false;
+      req.on('data', chunk => {
+        bytesRead += chunk.length;
+        if (bytesRead > 16 * 1024) {
+          bodyTooLarge = true;
+          req.pause();
+          res.writeHead(413, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Payload Too Large' }));
+          return;
+        }
+        body += chunk;
+      });
+      req.on('end', async () => {
+        if (bodyTooLarge) return;
+        let parsed;
+        try { parsed = JSON.parse(body); } catch {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Invalid JSON payload' }));
+          return;
+        }
+        const feedback = typeof parsed?.feedback === 'string' ? parsed.feedback.trim().toLowerCase() : '';
+        if (!['like', 'dislike'].includes(feedback)) {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Feedback must be like or dislike' }));
+          return;
+        }
+        const event = createPromptAiiLearningEvent({
+          requestId: parsed.request_id || requestId,
+          input: typeof parsed.idea === 'string' ? parsed.idea : '',
+          target: parsed.target || 'prompt-generation',
+          model: parsed.model || null,
+          strategy: parsed.strategy || null,
+          outcome: feedback === 'like' ? 'success' : 'failure',
+          feedback: { type: feedback, reason: parsed.reason || null },
+          metadata: { category: parsed.category || null, feedbackSource: 'prompt-aii-ui' }
+        });
+        try { await feedbackLearningStore.record(event); } catch {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Learning event could not be recorded' }));
+          return;
+        }
+        res.writeHead(202, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, accepted: true, learning_event_id: event.id }));
+      });
       return;
     }
 

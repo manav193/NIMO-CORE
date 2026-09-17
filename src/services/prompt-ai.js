@@ -81,6 +81,22 @@ export class PromptAIClient {
     }
   }
 
+  async recordFeedback({ requestId = null, idea = '', feedback, reason = null, model = null, category = null, target = 'prompt-generation', strategy = null } = {}) {
+    const normalized = String(feedback || '').trim().toLowerCase();
+    if (!['like', 'dislike'].includes(normalized)) return { success: false, error: 'INVALID_FEEDBACK' };
+    if (!this.isConfigured()) return { success: false, error: 'PROMPT_AI_NOT_CONFIGURED' };
+    try {
+      const response = await this.fetch(`${this.baseUrl}/api/nimo/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-NIMO-Integration-Key': this.integrationKey, ...(requestId ? { 'X-Request-ID': requestId } : {}) },
+        body: JSON.stringify({ request_id: requestId, idea, feedback: normalized, reason, model, category, target, strategy })
+      });
+      let data = null;
+      try { data = await response.json(); } catch {}
+      return response.ok ? data || { success: true } : { success: false, error: data?.error || `HTTP_${response.status}` };
+    } catch { return { success: false, error: 'FEEDBACK_NETWORK_FAILURE' }; }
+  }
+
   async compile({ message, context = {}, executionTarget = 'browser', model = 'NIMO', requestId = null } = {}) {
     const startedAt = Date.now();
     const input = typeof message === 'string' ? message.trim() : '';
