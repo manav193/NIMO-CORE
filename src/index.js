@@ -7,7 +7,7 @@ export { buildResponse } from './response-builder.js';
 export { NIMO_PERSONA } from './persona/nimo-persona.js';
 export { KnowledgeRegistry, createKnowledgeRegistry, registerProjectSource, getDefaultRegistry } from './knowledge/registry.js';
 export { normalizeProjectEntry, normalizeProjectSource } from './knowledge/schema.js';
-export { loadApprovedKnowledge, createApprovedKnowledgeLoader } from './knowledge/approved-loader.js';
+export { loadApprovedKnowledge, createApprovedKnowledgeLoader, VALID_RUNTIME_STATUSES } from './knowledge/approved-loader.js';
 export { NIMO_GLOSSARY } from './knowledge/glossary.js';
 export { ARCADE_OS_PROJECTS_SOURCE } from './knowledge/sources/arcade-os-projects.js';
 export { PROMPT_AII_SOURCE } from './knowledge/sources/prompt-aii.js';
@@ -32,6 +32,7 @@ export { createModuleNavigationAction } from './federation/navigation-contract.j
 export {
   createProjectEvent,
   isProjectEvent,
+  createSystemStatus,
   PROJECT_EVENT_TYPES
 } from './federation/project-events.js';
 export {
@@ -71,6 +72,18 @@ export {
 export { validatePromptAiiActivationManifest, canActivatePromptAiiKnowledge, resolveActivatedPromptAiiKnowledge } from './knowledge/prompt-aii-activation.js';
 export { buildPromptAiiStrategy } from './knowledge/prompt-aii-strategy.js';
 export { resolvePromptAiiRuntimeStrategy, isPromptAiiKnowledgeContext, clearPromptAiiRuntimeCache } from './knowledge/prompt-aii-runtime.js';
+export {
+  RUNTIME_GOVERNED_STATUSES,
+  isApprovedOrActive,
+  validateCatalogStructure,
+  validateKnowledgeEntry,
+  sanitizeDiagnosticMessage,
+  KnowledgeProvider,
+  HttpKnowledgeProvider,
+  MemoryKnowledgeProvider,
+  GovernedKnowledgeClient,
+  createGovernedKnowledgeClient
+} from './knowledge/knowledge-client.js';
 
 export { default as worker, handleWorkerRequest } from './worker.js';
 import worker from './worker.js';

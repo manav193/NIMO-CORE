@@ -28,6 +28,7 @@ export function createPromptAiiLearningEvent({
   target = null,
   model = null,
   strategy = null,
+  responseMetadata = {},
   outcome = 'unknown',
   feedback = null,
   latency = null,
@@ -41,6 +42,9 @@ export function createPromptAiiLearningEvent({
       ? EVENT_TYPES.INTERACTION_FAILURE
       : EVENT_TYPES.DETERMINISTIC_RESOLUTION;
 
+  const resolvedTarget = target || responseMetadata?.target || null;
+  const resolvedStrategy = strategy || responseMetadata?.strategy || null;
+
   return createLearningEvent({
     requestId,
     eventType,
@@ -50,8 +54,9 @@ export function createPromptAiiLearningEvent({
     language,
     inputMetadata: extractSafeInputMetadata(input),
     responseMetadata: {
-      target: target ? String(target).slice(0, 64) : null,
-      strategy: strategy ? String(strategy).slice(0, 128) : null
+      ...(responseMetadata && typeof responseMetadata === 'object' ? responseMetadata : {}),
+      target: resolvedTarget ? String(resolvedTarget).slice(0, 64) : null,
+      strategy: resolvedStrategy ? String(resolvedStrategy).slice(0, 128) : null
     },
     outcome: normalizedOutcome,
     feedback: feedback ? sanitizeMetadata(feedback) : null,

@@ -21,6 +21,7 @@
     "./server/gateway": "./src/server/gateway.js",
     "./worker": "./src/worker.js",
     "./learning": "./src/learning/index.js",
+    "./knowledge-client": "./src/knowledge/knowledge-client.js",
     "./project-manifest.schema.json": "./schemas/project-manifest.schema.json"
   },
   "scripts": {

@@ -11,37 +11,53 @@ const STRATEGY_FIELDS = Object.freeze([
   'guidelines'
 ]);
 
-function assertActivated(activated) {
+function normalizeActivated(activated) {
   if (!activated || typeof activated !== 'object') {
     throw new TypeError('Activated Prompt-Aii knowledge is required');
   }
-  if (activated.activation?.sourceProject !== 'prompt-aii') {
+
+  const isWrapper = Boolean(activated.activation && activated.entry);
+  const activation = isWrapper
+    ? activated.activation
+    : {
+        sourceProject: activated.sourceProject,
+        status: activated.status,
+        sanitized: activated.metadata?.sanitized === true || activated.sanitized === true,
+        knowledgeEntryId: activated.id,
+        catalogVersion: activated.catalogVersion || null
+      };
+  const entry = isWrapper ? activated.entry : activated;
+
+  if (activation.sourceProject !== 'prompt-aii') {
     throw new TypeError('Prompt-Aii strategy requires a Prompt-Aii activation');
   }
-  if (activated.activation?.status !== 'approved') {
+  const statusLower = String(activation.status || '').toLowerCase();
+  if (statusLower !== 'approved' && statusLower !== 'active') {
     throw new TypeError('Prompt-Aii strategy requires approved knowledge');
   }
-  if (activated.activation?.sanitized !== true) {
+  if (activation.sanitized !== true) {
     throw new TypeError('Prompt-Aii strategy requires sanitized knowledge');
   }
-  if (!activated.entry || activated.entry.id !== activated.activation.knowledgeEntryId) {
+  if (!entry || entry.id !== activation.knowledgeEntryId) {
     throw new TypeError('Activated Prompt-Aii entry does not match its manifest');
   }
+
+  return { activation, entry };
 }
 
 /**
  * Project an approved Prompt-Aii knowledge entry into bounded runtime guidance.
  * No raw user input or provider credential is accepted by this function.
  */
-export function buildPromptAiiStrategy(activated) {
-  assertActivated(activated);
-  const entry = activated.entry;
+export function buildPromptAiiStrategy(input) {
+  const { activation, entry } = normalizeActivated(input);
 
   return Object.freeze({
     sourceProject: 'prompt-aii',
     knowledgeEntryId: entry.id,
     knowledgeVersion: entry.version,
-    catalogVersion: activated.activation.catalogVersion || null,
+    status: String(activation.status || 'approved').toLowerCase(),
+    catalogVersion: activation.catalogVersion || null,
     summary: String(entry.summary || '').trim(),
     content: String(entry.content || '').trim(),
     guidelines: Array.isArray(entry.guidelines)

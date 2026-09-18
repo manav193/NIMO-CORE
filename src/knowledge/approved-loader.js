@@ -6,7 +6,8 @@
  * sanitized. It never promotes, activates, or mutates knowledge state.
  */
 
-const APPROVED_STATUSES = new Set(['approved', 'APPROVED']);
+export const VALID_RUNTIME_STATUSES = Object.freeze(new Set(['approved', 'APPROVED', 'active', 'ACTIVE']));
+const APPROVED_STATUSES = VALID_RUNTIME_STATUSES;
 
 function isPlainObject(value) {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -15,7 +16,7 @@ function isPlainObject(value) {
 function normalizeEntry(entry) {
   if (!isPlainObject(entry)) return null;
   if (!entry.id || !entry.sourceProject || !entry.title || !entry.content) return null;
-  if (!APPROVED_STATUSES.has(entry.status)) return null;
+  if (!VALID_RUNTIME_STATUSES.has(entry.status)) return null;
   if (entry.metadata?.sanitized !== true) return null;
 
   return Object.freeze({
@@ -34,7 +35,7 @@ function normalizeEntry(entry) {
 }
 
 /**
- * Load only catalog entries explicitly marked approved and sanitized.
+ * Load only catalog entries explicitly marked approved/active and sanitized.
  * `entries` is a map/object keyed by catalog path or entry id.
  */
 export function loadApprovedKnowledge({ catalog, entries = [] } = {}) {
@@ -57,16 +58,29 @@ export function loadApprovedKnowledge({ catalog, entries = [] } = {}) {
     const entry = byId.get(id);
     const normalized = normalizeEntry(entry);
 
-    if (catalogStatus !== 'approved' || !normalized || normalized.id !== id) {
+    if (!VALID_RUNTIME_STATUSES.has(catalogStatus) || !normalized || normalized.id !== id) {
       skipped.push({ id, reason: !entry ? 'ENTRY_NOT_FOUND' : 'NOT_APPROVED_OR_SANITIZED' });
       continue;
     }
+
+    const provenance = Object.freeze({
+      approvedBy: normalized.metadata?.approvedBy || item.provenance?.approvedBy || null,
+      evidence: Object.freeze(
+        normalized.evidence?.length > 0
+          ? [...normalized.evidence]
+          : (Array.isArray(item.provenance?.evidence) ? [...item.provenance.evidence] : [])
+      ),
+      catalogVersion: String(catalog.catalogVersion || 'unknown'),
+      path: String(item.path || ''),
+      catalogUpdatedAt: item.updatedAt || null
+    });
 
     loaded.push(Object.freeze({
       ...normalized,
       catalogVersion: String(catalog.catalogVersion || 'unknown'),
       path: String(item.path || ''),
-      catalogUpdatedAt: item.updatedAt || null
+      catalogUpdatedAt: item.updatedAt || null,
+      provenance
     }));
   }
 

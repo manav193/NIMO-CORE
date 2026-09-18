@@ -352,7 +352,7 @@ export function createServer({
         const feedback = typeof parsed?.feedback === 'string' ? parsed.feedback.trim().toLowerCase() : '';
         if (!['like', 'dislike'].includes(feedback)) {
           res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ success: false, error: 'Feedback must be like or dislike' }));
+          res.end(JSON.stringify({ success: false, error: 'Invalid feedback' }));
           return;
         }
         const event = createPromptAiiLearningEvent({
@@ -370,8 +370,8 @@ export function createServer({
           res.end(JSON.stringify({ success: false, error: 'Learning event could not be recorded' }));
           return;
         }
-        res.writeHead(202, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, accepted: true, learning_event_id: event.id }));
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, recorded: true, accepted: true, learning_event_id: event.id }));
       });
       return;
     }

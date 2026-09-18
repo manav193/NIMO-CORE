@@ -13,7 +13,7 @@ export function validatePromptAiiActivationManifest(manifest) {
   if (!manifest || typeof manifest !== 'object') throw new TypeError('Prompt-Aii activation manifest must be an object');
   if (!ID_PATTERN.test(String(manifest.knowledgeEntryId || ''))) throw new TypeError('Invalid Prompt-Aii knowledgeEntryId');
   if (manifest.sourceProject !== 'prompt-aii') throw new TypeError('Prompt-Aii activation requires sourceProject=prompt-aii');
-  if (manifest.status !== 'approved') throw new TypeError('Only approved Prompt-Aii knowledge may be activated');
+  if (manifest.status !== 'approved' && manifest.status !== 'active') throw new TypeError('Only approved or active Prompt-Aii knowledge may be activated');
   if (!Number.isInteger(manifest.version) || manifest.version < 1) throw new TypeError('Prompt-Aii knowledge version must be a positive integer');
   if (!PATH_PATTERN.test(String(manifest.knowledgePath || ''))) throw new TypeError('Invalid Prompt-Aii knowledge path');
   if (typeof manifest.approvedBy !== 'string' || !manifest.approvedBy.trim()) throw new TypeError('Prompt-Aii activation requires reviewer provenance');
@@ -22,7 +22,7 @@ export function validatePromptAiiActivationManifest(manifest) {
   return Object.freeze({
     knowledgeEntryId: manifest.knowledgeEntryId,
     sourceProject: 'prompt-aii',
-    status: 'approved',
+    status: String(manifest.status).toLowerCase(),
     version: manifest.version,
     knowledgePath: manifest.knowledgePath,
     approvedBy: manifest.approvedBy,
