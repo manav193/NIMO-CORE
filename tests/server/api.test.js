@@ -106,6 +106,40 @@ test('Server API suite', async t => {
     const res = await fetch(`${BASE}/api/health`, { method: 'POST' });
     assert.equal(res.status, 405);
   });
+
+  await t.test('POST /api/nimo/feedback accepts sanitized Prompt-Aii feedback', async () => {
+    const res = await fetch(`${BASE}/api/nimo/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        request_id: 'test-feedback-1',
+        feedback: 'like',
+        model: 'gpt-5.6',
+        category: 'text',
+        target: 'chatgpt',
+        strategy: 'deep'
+      })
+    });
+    assert.equal(res.status, 200);
+    const data = await res.json();
+    assert.equal(data.success, true);
+    assert.equal(data.recorded, true);
+  });
+
+  await t.test('POST /api/nimo/feedback rejects invalid feedback without creating a learning event', async () => {
+    const res = await fetch(`${BASE}/api/nimo/feedback`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        request_id: 'test-feedback-invalid',
+        feedback: 'maybe'
+      })
+    });
+    assert.equal(res.status, 400);
+    const data = await res.json();
+    assert.equal(data.success, false);
+    assert.equal(data.error, 'Invalid feedback');
+  });
 });
 
 test('Server rate limiting rejects requests exceeding limit with 429', async () => {
