@@ -382,6 +382,20 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
 
     const response = nimoEngine.respond(message, { ...context, requestId });
 
+    const hasConfiguredApiKey = Boolean(
+      (typeof env.OPENROUTER_API_KEY === 'string' && env.OPENROUTER_API_KEY.trim()) ||
+      (typeof globalThis.process?.env?.OPENROUTER_API_KEY === 'string' && globalThis.process.env.OPENROUTER_API_KEY.trim())
+    );
+
+    console.log(JSON.stringify({
+      level: 'info',
+      event: 'core_route_resolved',
+      requestId,
+      intent: response.intent,
+      hasApiKey: hasConfiguredApiKey,
+      messageLength: message.length
+    }));
+
     // If deterministic response was fallback and AI is configured, attempt remote fallback
     const apiKey = (typeof env.OPENROUTER_API_KEY === 'string' && env.OPENROUTER_API_KEY.trim()) ||
       (typeof globalThis.process?.env?.OPENROUTER_API_KEY === 'string' && globalThis.process.env.OPENROUTER_API_KEY.trim()) ||
