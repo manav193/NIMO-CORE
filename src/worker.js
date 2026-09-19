@@ -10,6 +10,12 @@ const MAX_BODY_SIZE = 64 * 1024; // 64 KB limit
 const DEFAULT_RATE_LIMIT = 60; // requests per minute
 const RATE_WINDOW_MS = 60 * 1000;
 
+function createRequestId() {
+  const uuid = globalThis.crypto?.randomUUID?.();
+  if (uuid) return `req-${Date.now()}-${uuid.slice(0, 8)}`;
+  return `req-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 /**
  * In-memory fallback rate limiter for isolate-level throttling.
  */
@@ -227,7 +233,7 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
   const allowedOrigins = getAllowedOrigins(env);
   const isAllowedOrigin = origin && allowedOrigins.has(origin);
   const requestId = request.headers.get('x-request-id') ||
-    `req-${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+    createRequestId();
 
   // Standard security headers
   const securityHeaders = {
