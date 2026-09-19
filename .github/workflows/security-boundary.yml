@@ -1,0 +1,40 @@
+name: NIMO-CORE Security Boundary
+
+on:
+  pull_request:
+    paths:
+      - "src/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/**"
+      - "SECURITY.md"
+  push:
+    branches: ["main"]
+    paths:
+      - "src/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/**"
+      - "SECURITY.md"
+
+permissions:
+  contents: read
+
+jobs:
+  boundary-check:
+    name: Protected Core Boundary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify no obvious provider secrets are committed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE 'sk-or-v1-[A-Za-z0-9_-]{20,}' src wrangler.jsonc .github 2>/dev/null; then
+            echo "Potential OpenRouter secret detected in protected files."
+            exit 1
+          fi
+      - name: Verify security boundary documentation
+        shell: bash
+        run: |
+          test -s SECURITY.md
+          test -s .github/CODEOWNERS
+          echo "Protected core boundary present."
