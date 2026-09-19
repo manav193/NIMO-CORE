@@ -46,16 +46,11 @@ jobs:
       - name: Test
         run: npm test
 
-      - name: Validate required secrets
+      - name: Validate Cloudflare credentials
         shell: bash
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo 'Missing CLOUDFLARE_API_TOKEN'; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo 'Missing CLOUDFLARE_ACCOUNT_ID'; exit 1; }
-          test -n "${{ secrets.OPENROUTER_API_KEY }}" || { echo 'Missing OPENROUTER_API_KEY'; exit 1; }
-
-      - name: Configure OpenRouter secret
-        shell: bash
-        run: printf '%s' '${{ secrets.OPENROUTER_API_KEY }}' | npx wrangler secret put OPENROUTER_API_KEY
 
       - name: Deploy Worker
         run: npx wrangler deploy
