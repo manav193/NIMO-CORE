@@ -445,3 +445,36 @@ test('OpenRouter fails over from primary verified model to secondary verified mo
     'nvidia/nemotron-3-ultra-550b-a55b:free'
   ]);
 });
+
+
+test('OpenRouter normalizes invalid and out-of-range timeout values', () => {
+  const low = new OpenRouterProvider({ apiKey: 'test-key', timeoutMs: 1 });
+  assert.equal(low.timeoutMs, 1000);
+
+  const high = new OpenRouterProvider({ apiKey: 'test-key', timeoutMs: 999999 });
+  assert.equal(high.timeoutMs, 30000);
+
+  const invalid = new OpenRouterProvider({ apiKey: 'test-key', timeoutMs: 'not-a-number' });
+  assert.equal(invalid.timeoutMs, 15000);
+});
+
+test('OpenRouter explicitly requests a non-streaming JSON response', async () => {
+  const mockFetch = async (url, opts) => {
+    const body = JSON.parse(opts.body);
+    assert.equal(body.stream, false);
+    assert.equal(opts.headers.Accept, 'application/json');
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        model: 'nvidia/nemotron-3-super-120b-a12b:free',
+        choices: [{ message: { content: 'OK' } }]
+      })
+    };
+  };
+
+  const provider = new OpenRouterProvider({ apiKey: 'test-key', fetchFn: mockFetch });
+  const result = await provider.complete({ messages: [{ role: 'user', content: 'ping' }] });
+  assert.equal(result.success, true);
+  assert.equal(result.reply, 'OK');
+});
