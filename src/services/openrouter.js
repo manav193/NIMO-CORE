@@ -52,7 +52,9 @@ export function isModelEligible(modelId, { allowlist = VERIFIED_FREE_CHAT_MODELS
   return true;
 }
 
-const DEFAULT_TIMEOUT_MS = 10000;
+const DEFAULT_TIMEOUT_MS = 15000;
+const MIN_TIMEOUT_MS = 1000;
+const MAX_TIMEOUT_MS = 30000;
 const MAX_RETRY_COUNT = 1;
 
 /**
@@ -144,7 +146,10 @@ export class OpenRouterProvider {
     });
 
     this.models = eligibleModels.length > 0 ? eligibleModels : [...DEFAULT_MODELS];
-    this.timeoutMs = timeoutMs;
+    const parsedTimeout = Number(timeoutMs);
+    this.timeoutMs = Number.isFinite(parsedTimeout)
+      ? Math.min(MAX_TIMEOUT_MS, Math.max(MIN_TIMEOUT_MS, parsedTimeout))
+      : DEFAULT_TIMEOUT_MS;
     this.fetch = resolveFetch(fetchFn);
     this.appUrl = appUrl;
     this.appName = appName;
@@ -218,6 +223,7 @@ export class OpenRouterProvider {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              'Accept': 'application/json',
               'Authorization': `Bearer ${this.apiKey}`,
               'HTTP-Referer': this.appUrl,
               'X-Title': this.appName,
@@ -227,7 +233,8 @@ export class OpenRouterProvider {
               model,
               messages,
               temperature,
-              max_tokens: maxTokens
+              max_tokens: maxTokens,
+              stream: false
             }),
             signal: controller.signal
           });
