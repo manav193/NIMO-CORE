@@ -88,3 +88,31 @@ export {
 export { default as worker, handleWorkerRequest } from './worker.js';
 import worker from './worker.js';
 export default worker;
+
+
+export {
+  PROVIDER_CAPABILITIES,
+  normalizeProviderManifest,
+  ProviderRegistry,
+  createProviderRegistry
+} from './providers/provider-registry.js';
+export {
+  createOpenRouterProviderManifest,
+  createOpenRouterProviderAdapter
+} from './providers/openrouter-provider.js';
+export {
+  CONNECTOR_CAPABILITIES,
+  ConnectorRegistry,
+  createConnectorRegistry
+} from './connectors/connector-registry.js';
+export {
+  WorkflowEngine,
+  createWorkflowEngine,
+  validateWorkflow
+} from './workflows/workflow-engine.js';
+export { EventBus, createEventBus } from './events/event-bus.js';
+export {
+  redactSecrets,
+  createCredentialReference
+} from './credentials/credential-references.js';
+export { evaluateExecutionPolicy } from './policies/execution-policy.js';
