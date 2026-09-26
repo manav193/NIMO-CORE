@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NIMO Provider Manifest",
+  "type": "object",
+  "required": ["id", "name", "capabilities"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "type": { "type": "string" },
+    "capabilities": { "type": "array", "items": { "type": "string" } },
+    "models": { "type": "array", "items": { "type": "string" } }
+  },
+  "additionalProperties": true
+}
