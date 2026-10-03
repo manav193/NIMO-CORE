@@ -3,6 +3,7 @@
   "name": "nimo-core",
   "main": "src/worker.js",
   "compatibility_date": "2026-07-28",
+  "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   "vars": {
     "OPENROUTER_MODELS": "nvidia/nemotron-3-super-120b-a12b:free,nvidia/nemotron-3-ultra-550b-a55b:free,inclusionai/ling-3.0-flash-vl:free",
