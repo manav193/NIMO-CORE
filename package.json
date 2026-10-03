@@ -37,5 +37,8 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "mongodb": "^6.21.0"
+  }
 }
