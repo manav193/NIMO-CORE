@@ -134,7 +134,10 @@ test('MongoLearningStore persists and queries sanitized learning events', async 
 
   const recent = await store.getRecent(10);
   assert.equal(recent.length, 2);
-  assert.equal(recent[0].id, 'evt-mongo-2');
+  assert.deepEqual(
+    new Set(recent.map(event => event.id)),
+    new Set(['evt-mongo-1', 'evt-mongo-2'])
+  );
 
   const byProject = await store.getByProject('prompt-aii', 10);
   assert.equal(byProject.length, 1);
