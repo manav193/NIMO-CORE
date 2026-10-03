@@ -82,7 +82,17 @@ export class NimoEngine {
         });
 
         if (activeStore && typeof activeStore.record === 'function') {
-          Promise.resolve(activeStore.record(event)).catch(() => {});
+          const recordPromise = Promise.resolve()
+            .then(() => activeStore.record(event))
+            .catch(() => {});
+
+          if (typeof options.waitUntil === 'function') {
+            try {
+              options.waitUntil(recordPromise);
+            } catch {
+              // ExecutionContext failures must never affect the response path.
+            }
+          }
         }
         if (typeof activeOnEvent === 'function') {
           try { activeOnEvent(event); } catch {}
