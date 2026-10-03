@@ -53,6 +53,8 @@ export {
   LearningStore,
   InMemoryLearningStore,
   createInMemoryLearningStore,
+  MongoLearningStore,
+  createMongoLearningStore,
   PROPOSAL_CATEGORIES,
   PROPOSAL_STATUSES,
   ImprovementProposal,
