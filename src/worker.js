@@ -5,6 +5,7 @@ import { PROMPT_AII_SOURCE } from './knowledge/sources/prompt-aii.js';
 import { createGenericProjectAdapter } from './adapters/generic-project-adapter.js';
 import { EVENT_TYPES, createLearningEvent, extractSafeInputMetadata } from './learning/events.js';
 import { OUTCOMES } from './learning/outcomes.js';
+import { createMongoLearningStore } from './learning/mongodb-store.js';
 
 const MAX_BODY_SIZE = 64 * 1024; // 64 KB limit
 const DEFAULT_RATE_LIMIT = 60; // requests per minute
@@ -62,6 +63,48 @@ export class RateLimiter {
 }
 
 const DEFAULT_LIMITER = new RateLimiter();
+
+let mongoLearningStore = null;
+let mongoLearningStoreUri = null;
+
+function getMongoLearningStore(uri) {
+  const normalizedUri = typeof uri === 'string' ? uri.trim() : '';
+  if (!normalizedUri) return null;
+
+  if (!mongoLearningStore || mongoLearningStoreUri !== normalizedUri) {
+    mongoLearningStore = createMongoLearningStore({
+      uri: normalizedUri,
+      databaseName: 'nimo_knowledge',
+      collectionName: 'learning_events'
+    });
+    mongoLearningStoreUri = normalizedUri;
+  }
+
+  return mongoLearningStore;
+}
+
+function scheduleLearningWrite(store, event, ctx) {
+  if (!store || typeof store.record !== 'function') return;
+
+  const promise = Promise.resolve()
+    .then(() => store.record(event))
+    .catch(error => {
+      console.warn(JSON.stringify({
+        level: 'warn',
+        event: 'learning_store_write_failed',
+        errorType: error?.name || 'LEARNING_STORE_ERROR',
+        errorCode: error?.code || null
+      }));
+    });
+
+  if (ctx && typeof ctx.waitUntil === 'function') {
+    try {
+      ctx.waitUntil(promise);
+    } catch {
+      // Never let background persistence affect the user response.
+    }
+  }
+}
 
 const DASHBOARD_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -377,7 +420,14 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
       ? parsed.context
       : {};
 
-    const learningStore = options.learningStore || env.learningStore || null;
+    const configuredMongoUri = typeof env.MONGODB_URI === 'string'
+      ? env.MONGODB_URI.trim()
+      : '';
+
+    const learningStore = options.learningStore ||
+      env.learningStore ||
+      getMongoLearningStore(configuredMongoUri);
+
     const nimoEngine = options.engine || createNimoEngine({
       adapters: [
       createGenericProjectAdapter({ source: ARCADE_OS_PROJECTS_SOURCE }),
@@ -386,7 +436,11 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
       learningStore
     });
 
-    const response = nimoEngine.respond(message, { ...context, requestId });
+    const response = nimoEngine.respond(
+      message,
+      { ...context, requestId },
+      { waitUntil: (promise) => ctx?.waitUntil?.(promise) }
+    );
 
     const hasConfiguredApiKey = Boolean(
       (typeof env.OPENROUTER_API_KEY === 'string' && env.OPENROUTER_API_KEY.trim()) ||
@@ -471,19 +525,17 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
                 requestId
               }));
 
-              if (learningStore && typeof learningStore.record === 'function') {
-                Promise.resolve(learningStore.record(createLearningEvent({
-                  requestId,
-                  eventType: EVENT_TYPES.AI_SUCCESS,
-                  source: 'openrouter',
-                  intent: 'ai_fallback',
-                  inputMetadata: extractSafeInputMetadata(message),
-                  responseMetadata: { length: aiResult.reply?.length || 0, model: aiResult.model },
-                  modelMetadata: { model: aiResult.model, provider: 'openrouter', latencyMs: aiResult.latencyMs },
-                  outcome: OUTCOMES.UNKNOWN,
-                  latency: aiResult.latencyMs
-                }))).catch(() => {});
-              }
+              scheduleLearningWrite(learningStore, createLearningEvent({
+                requestId,
+                eventType: EVENT_TYPES.AI_SUCCESS,
+                source: 'openrouter',
+                intent: 'ai_fallback',
+                inputMetadata: extractSafeInputMetadata(message),
+                responseMetadata: { length: aiResult.reply?.length || 0, model: aiResult.model },
+                modelMetadata: { model: aiResult.model, provider: 'openrouter', latencyMs: aiResult.latencyMs },
+                outcome: OUTCOMES.UNKNOWN,
+                latency: aiResult.latencyMs
+              }), ctx);
 
               return jsonResponse({
                 success: true,
@@ -502,17 +554,15 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
                 fallbackToDeterministic: true
               }));
 
-              if (learningStore && typeof learningStore.record === 'function') {
-                Promise.resolve(learningStore.record(createLearningEvent({
-                  requestId,
-                  eventType: EVENT_TYPES.AI_FAILURE,
-                  source: 'openrouter',
-                  intent: 'ai_fallback',
-                  inputMetadata: extractSafeInputMetadata(message),
-                  outcome: OUTCOMES.FAILURE,
-                  errorCode: aiResult?.error || 'UNKNOWN_PROVIDER_ERROR'
-                }))).catch(() => {});
-              }
+              scheduleLearningWrite(learningStore, createLearningEvent({
+                requestId,
+                eventType: EVENT_TYPES.AI_FAILURE,
+                source: 'openrouter',
+                intent: 'ai_fallback',
+                inputMetadata: extractSafeInputMetadata(message),
+                outcome: OUTCOMES.FAILURE,
+                errorCode: aiResult?.error || 'UNKNOWN_PROVIDER_ERROR'
+              }), ctx);
             }
           } catch (providerErr) {
             console.error(JSON.stringify({
@@ -524,17 +574,15 @@ export async function handleWorkerRequest(request, env = {}, ctx = {}, options =
               fallbackToDeterministic: true
             }));
 
-            if (learningStore && typeof learningStore.record === 'function') {
-              Promise.resolve(learningStore.record(createLearningEvent({
-                requestId,
-                eventType: EVENT_TYPES.AI_FAILURE,
-                source: 'openrouter',
-                intent: 'ai_fallback',
-                inputMetadata: extractSafeInputMetadata(message),
-                outcome: OUTCOMES.FAILURE,
-                errorCode: 'UNCAUGHT_PROVIDER_EXCEPTION'
-              }))).catch(() => {});
-            }
+            scheduleLearningWrite(learningStore, createLearningEvent({
+              requestId,
+              eventType: EVENT_TYPES.AI_FAILURE,
+              source: 'openrouter',
+              intent: 'ai_fallback',
+              inputMetadata: extractSafeInputMetadata(message),
+              outcome: OUTCOMES.FAILURE,
+              errorCode: 'UNCAUGHT_PROVIDER_EXCEPTION'
+            }), ctx);
           }
         } else if (provider) {
           console.warn(JSON.stringify({
