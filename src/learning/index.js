@@ -28,6 +28,11 @@ export {
 } from './store.js';
 
 export {
+  MongoLearningStore,
+  createMongoLearningStore
+} from './mongodb-store.js';
+
+export {
   PROPOSAL_CATEGORIES,
   PROPOSAL_STATUSES,
   ImprovementProposal,
