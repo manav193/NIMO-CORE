@@ -13,3 +13,6 @@ PROVIDER_TIMEOUT_MS=7500
 
 # Allowed CORS origins (comma-separated)
 ALLOWED_ORIGINS=https://manavagarwal.me,https://www.manavagarwal.me,http://localhost:8787,http://127.0.0.1:8787,http://localhost:3000,http://localhost:5173,http://localhost:8080
+
+# MongoDB Atlas learning store connection string (keep real value in .dev.vars only)
+MONGODB_URI=mongodb+srv://nimo-core:<password>@<cluster-host>/nimo_knowledge?authSource=admin&appName=NIMO-Knowledge
