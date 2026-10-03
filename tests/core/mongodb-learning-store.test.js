@@ -114,6 +114,7 @@ test('MongoLearningStore persists and queries sanitized learning events', async 
     intent: 'project_lookup',
     project: 'nimo',
     outcome: OUTCOMES.SUCCESS,
+    timestamp: '2026-01-01T00:00:00.000Z',
     inputMetadata: { userToken: 'should-not-persist' }
   });
 
@@ -123,7 +124,8 @@ test('MongoLearningStore persists and queries sanitized learning events', async 
     source: 'openrouter',
     intent: 'ai_fallback',
     project: 'prompt-aii',
-    outcome: OUTCOMES.FAILURE
+    outcome: OUTCOMES.FAILURE,
+    timestamp: '2026-01-01T00:00:01.000Z'
   });
 
   await store.record(first);
